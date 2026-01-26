@@ -12,7 +12,7 @@ import (
 func OpenAIFunctionToMCPTool(fn *openai.FunctionDefinition) mcp.Tool {
 	inputSchema := []byte(`{"type": "object", "properties": {}}`)
 	if def, ok := fn.Parameters.(jsonschema.Definition); ok {
-		inputSchema = convertDefinition(def)
+		inputSchema, _ = json.Marshal(def)
 	}
 
 	return mcp.NewTool(
@@ -20,91 +20,6 @@ func OpenAIFunctionToMCPTool(fn *openai.FunctionDefinition) mcp.Tool {
 		mcp.WithDescription(fn.Description),
 		mcp.WithRawInputSchema(inputSchema),
 	)
-}
-
-func convertDefinition(def jsonschema.Definition) []byte {
-	schema := make(map[string]any)
-
-	if def.Type != "" {
-		schema["type"] = string(def.Type)
-	}
-	if def.Description != "" {
-		schema["description"] = def.Description
-	}
-	if len(def.Enum) > 0 {
-		schema["enum"] = def.Enum
-	}
-	if len(def.Required) > 0 {
-		schema["required"] = def.Required
-	}
-	if len(def.Properties) > 0 {
-		schema["properties"] = convertProperties(def.Properties)
-	}
-	if def.Items != nil {
-		schema["items"] = convertDefinition(*def.Items)
-	}
-	if def.AdditionalProperties != nil {
-		schema["additionalProperties"] = def.AdditionalProperties
-	}
-	if def.Nullable {
-		schema["nullable"] = true
-	}
-	if def.Ref != "" {
-		schema["$ref"] = def.Ref
-	}
-	if len(def.Defs) > 0 {
-		schema["$defs"] = convertDefs(def.Defs)
-	}
-
-	data, _ := json.Marshal(schema)
-	return data
-}
-
-func convertProperties(props map[string]jsonschema.Definition) map[string]any {
-	result := make(map[string]any, len(props))
-	for key, def := range props {
-		result[key] = definitionToMap(def)
-	}
-	return result
-}
-
-func definitionToMap(def jsonschema.Definition) map[string]any {
-	prop := make(map[string]any)
-
-	if def.Type != "" {
-		prop["type"] = string(def.Type)
-	}
-	if def.Description != "" {
-		prop["description"] = def.Description
-	}
-	if len(def.Enum) > 0 {
-		prop["enum"] = def.Enum
-	}
-	if len(def.Properties) > 0 {
-		prop["properties"] = convertProperties(def.Properties)
-	}
-	if def.Items != nil {
-		prop["items"] = convertDefinition(*def.Items)
-	}
-	if def.AdditionalProperties != nil {
-		prop["additionalProperties"] = def.AdditionalProperties
-	}
-	if def.Nullable {
-		prop["nullable"] = true
-	}
-	if def.Ref != "" {
-		prop["$ref"] = def.Ref
-	}
-
-	return prop
-}
-
-func convertDefs(defs map[string]jsonschema.Definition) map[string]any {
-	result := make(map[string]any, len(defs))
-	for key, def := range defs {
-		result[key] = json.RawMessage(convertDefinition(def))
-	}
-	return result
 }
 
 func ConvertOpenAIToolsToMCP(tools []openai.Tool) []mcp.Tool {

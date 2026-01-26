@@ -10,7 +10,7 @@ import (
 )
 
 func OpenAIFunctionToMCPTool(fn *openai.FunctionDefinition) mcp.Tool {
-	inputSchema := convertDefinitionToSchema(fn.Parameters)
+	inputSchema := convertParameters(fn.Parameters)
 
 	return mcp.NewTool(
 		fn.Name,
@@ -19,38 +19,31 @@ func OpenAIFunctionToMCPTool(fn *openai.FunctionDefinition) mcp.Tool {
 	)
 }
 
-func convertDefinitionToSchema(params any) json.RawMessage {
+func convertParameters(params any) json.RawMessage {
 	if params == nil {
-		return json.RawMessage(`{"type": "object", "properties": {}}`)
+		return []byte(`{"type": "object", "properties": {}}`)
 	}
 
 	switch p := params.(type) {
 	case jsonschema.Definition:
 		return convertDefinition(p)
 	case map[string]any:
-		return convertMapToJSONSchema(p)
+		return convertMapSchema(p)
 	case []byte:
 		return p
 	default:
-		return marshalToJSON(p)
+		return marshalJSON(p)
 	}
 }
 
-func convertDefinition(def jsonschema.Definition) json.RawMessage {
+func convertDefinition(def jsonschema.Definition) []byte {
 	schema := make(map[string]any)
 
-	if def.Type != "" {
-		schema["type"] = string(def.Type)
-	}
-	if def.Description != "" {
-		schema["description"] = def.Description
-	}
-	if len(def.Enum) > 0 {
-		schema["enum"] = def.Enum
-	}
-	if len(def.Required) > 0 {
-		schema["required"] = def.Required
-	}
+	setString(schema, "type", string(def.Type))
+	setString(schema, "description", def.Description)
+	setArray(schema, "enum", def.Enum)
+	setArray(schema, "required", def.Required)
+
 	if def.Properties != nil {
 		schema["properties"] = convertProperties(def.Properties)
 	}
@@ -77,87 +70,108 @@ func convertDefinition(def jsonschema.Definition) json.RawMessage {
 func convertProperties(props map[string]jsonschema.Definition) map[string]any {
 	result := make(map[string]any)
 	for key, def := range props {
-		schema := make(map[string]any)
-		if def.Type != "" {
-			schema["type"] = string(def.Type)
-		}
-		if def.Description != "" {
-			schema["description"] = def.Description
-		}
-		if len(def.Enum) > 0 {
-			schema["enum"] = def.Enum
-		}
-		if def.Properties != nil {
-			schema["properties"] = convertProperties(def.Properties)
-		}
-		if def.Items != nil {
-			schema["items"] = convertDefinition(*def.Items)
-		}
-		if def.AdditionalProperties != nil {
-			schema["additionalProperties"] = def.AdditionalProperties
-		}
-		result[key] = schema
+		result[key] = convertDefinitionToMap(def)
 	}
 	return result
+}
+
+func convertDefinitionToMap(def jsonschema.Definition) map[string]any {
+	schema := make(map[string]any)
+
+	setString(schema, "type", string(def.Type))
+	setString(schema, "description", def.Description)
+	setArray(schema, "enum", def.Enum)
+
+	if def.Properties != nil {
+		schema["properties"] = convertProperties(def.Properties)
+	}
+	if def.Items != nil {
+		schema["items"] = convertDefinition(*def.Items)
+	}
+	if def.AdditionalProperties != nil {
+		schema["additionalProperties"] = def.AdditionalProperties
+	}
+	if def.Nullable {
+		schema["nullable"] = true
+	}
+	if def.Ref != "" {
+		schema["$ref"] = def.Ref
+	}
+
+	return schema
 }
 
 func convertDefs(defs map[string]jsonschema.Definition) map[string]any {
 	result := make(map[string]any)
 	for key, def := range defs {
-		result[key] = convertDefinitionToSchema(def)
+		result[key] = json.RawMessage(convertDefinition(def))
 	}
 	return result
 }
 
-func convertMapToJSONSchema(m map[string]any) json.RawMessage {
+func convertMapSchema(m map[string]any) []byte {
 	schema := make(map[string]any)
 
-	if typeStr, ok := m["type"].(string); ok {
-		schema["type"] = typeStr
+	if t, ok := m["type"].(string); ok {
+		schema["type"] = t
 	}
-	if desc, ok := m["description"].(string); ok {
-		schema["description"] = desc
+	if d, ok := m["description"].(string); ok {
+		schema["description"] = d
 	}
-	if enums := m["enum"]; enums != nil {
-		schema["enum"] = enums
+	if e := m["enum"]; e != nil {
+		schema["enum"] = e
 	}
-	if required, ok := m["required"].([]any); ok {
-		reqStrings := make([]string, len(required))
-		for i, r := range required {
-			if s, ok := r.(string); ok {
-				reqStrings[i] = s
+	if r := m["required"]; r != nil {
+		if reqSlice, ok := r.([]any); ok {
+			reqStrings := make([]string, len(reqSlice))
+			for i, v := range reqSlice {
+				if s, ok := v.(string); ok {
+					reqStrings[i] = s
+				}
 			}
+			schema["required"] = reqStrings
 		}
-		schema["required"] = reqStrings
 	}
-	if properties, ok := m["properties"].(map[string]any); ok {
-		schema["properties"] = properties
+	if p := m["properties"]; p != nil {
+		schema["properties"] = p
 	}
-	if items := m["items"]; items != nil {
-		schema["items"] = items
+	if i := m["items"]; i != nil {
+		schema["items"] = i
 	}
-	if additionalProperties, ok := m["additionalProperties"].(bool); ok {
-		schema["additionalProperties"] = additionalProperties
+	if ap := m["additionalProperties"]; ap != nil {
+		schema["additionalProperties"] = ap
 	}
 
 	data, _ := json.Marshal(schema)
 	return data
 }
 
-func marshalToJSON(v any) json.RawMessage {
+func setString(m map[string]any, key, value string) {
+	if value != "" {
+		m[key] = value
+	}
+}
+
+func setArray(m map[string]any, key string, value []string) {
+	if len(value) > 0 {
+		m[key] = value
+	}
+}
+
+func marshalJSON(v any) []byte {
 	data, err := json.Marshal(v)
 	if err != nil {
-		return json.RawMessage(`{"type": "object"}`)
+		return []byte(`{"type": "object"}`)
 	}
 	return data
 }
 
 func ConvertOpenAIToolsToMCP(openaiTools []openai.Tool) []mcp.Tool {
-	mcpTools := make([]mcp.Tool, 0, len(openaiTools))
+	mcpTools := make([]mcp.Tool, len(openaiTools))
 
-	for _, tool := range openaiTools {
+	for i, tool := range openaiTools {
 		if tool.Function != nil {
-			mcpTools = append(mcpTools, OpenAIFunctionToMCPTool(tool.Function))
+			mcpTools[i] = OpenAIFunctionToMCPTool(tool.Function)
 		}
 	}
 
@@ -165,14 +179,9 @@ func ConvertOpenAIToolsToMCP(openaiTools []openai.Tool) []mcp.Tool {
 }
 
 type CalculatorParams struct {
-	Operation string  `json:"operation"`
-	A         float64 `json:"a"`
-	B         float64 `json:"b"`
-}
-
-type WeatherParams struct {
-	Location string `json:"location" description:"City name"`
-	Unit     string `json:"unit,omitempty" description:"Temperature unit" enum:"celsius,fahrenheit"`
+	Operation string  `json:"operation" description:"Operation to perform" enum:"add,subtract,multiply,divide"`
+	A         float64 `json:"a" description:"First number"`
+	B         float64 `json:"b" description:"Second number"`
 }
 
 func UsageExample() {
@@ -199,22 +208,21 @@ func UsageExample() {
 	}
 
 	mcpTool := OpenAIFunctionToMCPTool(weatherTool.Function)
-	fmt.Printf("MCP Tool from Definition: %+v\n", mcpTool)
+	fmt.Printf("MCP Tool: %s - %s\n", mcpTool.Name, mcpTool.Description)
 
-	schema, _ := jsonschema.GenerateSchemaForType(WeatherParams{})
-	autoSchemaTool := openai.Tool{
+	schema, _ := jsonschema.GenerateSchemaForType(CalculatorParams{})
+	autoTool := openai.Tool{
 		Type: openai.ToolTypeFunction,
 		Function: &openai.FunctionDefinition{
-			Name:        "get_weather_auto",
-			Description: "Get weather using auto-generated schema",
+			Name:        "calculator",
+			Description: "Perform arithmetic operations",
 			Parameters:  *schema,
 		},
 	}
 
-	mcpToolFromAuto := OpenAIFunctionToMCPTool(autoSchemaTool.Function)
-	_ = mcpToolFromAuto
+	mcpAutoTool := OpenAIFunctionToMCPTool(autoTool.Function)
+	_ = mcpAutoTool
 
-	multipleTools := []openai.Tool{weatherTool, autoSchemaTool}
-	mcpToolList := ConvertOpenAIToolsToMCP(multipleTools)
-	fmt.Printf("Converted %d tools\n", len(mcpToolList))
+	mcpTools := ConvertOpenAIToolsToMCP([]openai.Tool{weatherTool, autoTool})
+	fmt.Printf("Converted %d tools\n", len(mcpTools))
 }

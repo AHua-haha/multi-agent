@@ -2,7 +2,10 @@ module multi-agent
 
 go 1.25.3
 
-require github.com/mark3labs/mcp-go v0.43.2
+require (
+	github.com/mark3labs/mcp-go v0.43.2
+	github.com/sashabaranov/go-openai v1.41.2
+)
 
 require (
 	github.com/bahlo/generic-list-go v0.2.0 // indirect

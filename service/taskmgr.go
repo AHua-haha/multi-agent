@@ -1,4 +1,4 @@
-package taskMgr
+package service
 
 import (
 	"fmt"

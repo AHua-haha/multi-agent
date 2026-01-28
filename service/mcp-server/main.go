@@ -2,14 +2,14 @@ package main
 
 import (
 	"context"
-	"multi-agent/taskMgr"
+	"multi-agent/service"
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 )
 
 func main() {
-	mgr := &taskMgr.TaskMgr{}
+	mgr := &service.TaskMgr{}
 	s := server.NewMCPServer("Task Manager Mcp Server", "v1.0", server.WithToolCapabilities(true))
 	s.AddTool(mcp.Tool{
 		Name:        "ello",

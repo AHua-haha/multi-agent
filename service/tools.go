@@ -11,7 +11,34 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/rs/zerolog/log"
+	"mvdan.cc/sh/v3/syntax"
 )
+
+func ExtractAllBinaries(shellCmd string) ([]string, error) {
+	parser := syntax.NewParser()
+	file, err := parser.Parse(strings.NewReader(shellCmd), "")
+	if err != nil {
+		return nil, fmt.Errorf("error when parsing shell command: %v", err)
+	}
+
+	var binaries []string
+	syntax.Walk(file, func(node syntax.Node) bool {
+		switch x := node.(type) {
+		case *syntax.CallExpr:
+			if len(x.Args) > 0 {
+				binName := x.Args[0].Lit()
+				if binName != "" {
+					binaries = append(binaries, binName)
+				}
+			}
+		}
+		return true // Continue walking the rest of the tree
+	})
+
+	return binaries, nil
+}
 
 func ViewFile(file string, lines [][]int) (string, error) {
 	var builder strings.Builder
@@ -137,4 +164,145 @@ func CreateFile(path string, content string) error {
 	}
 
 	return nil
+}
+
+var readOnlyWhitelist = map[string]bool{
+	"ls": true, "cat": true, "grep": true, "pwd": true, "find": true,
+	"head": true, "tail": true, "wc": true, "du": true, "df": true,
+	"ps": true, "whoami": true, "file": true, "stat": true,
+	"cd": true, "rg": true,
+}
+
+type BashTool struct {
+	tempIndexFile string
+	gitRepoPath   string
+}
+
+type BashRes struct {
+	ExitCode      int      `json:"exit_code"`
+	Output        string   `json:"output"`         // Combined Stdout and Stderr
+	ModifiedFiles []string `json:"modified_files"` // Files that existed and changed
+	CreatedFiles  []string `json:"created_files"`  // Brand new files
+	DeletedFiles  []string `json:"deleted_files"`  // Files removed
+}
+
+func (tool *BashTool) AddRepo(path string) error {
+	tmpFile := filepath.Join(os.TempDir(), "agent_index_shared")
+
+	tool.gitRepoPath = path
+	tool.tempIndexFile = tmpFile
+
+	initCmd := exec.Command("git", "read-tree", "HEAD")
+	initCmd.Dir = tool.gitRepoPath
+	initCmd.Env = append(os.Environ(), "GIT_INDEX_FILE="+tool.tempIndexFile)
+	err := initCmd.Run()
+	if err != nil {
+		log.Error().Err(err).Any("cmd", initCmd.String()).Msg("init cmd run failed")
+		return err
+	}
+	log.Info().Any("git repo", tool.gitRepoPath).Any("tmp index", tool.tempIndexFile).Msg("init bash tool")
+	return nil
+}
+func (tool *BashTool) Run(cmd string, dir string) (*BashRes, error) {
+	res, _ := tool.tryRunReadBash(cmd, dir)
+	if res != nil {
+		return res, nil
+	}
+	return tool.runBashWithDiff(cmd, dir)
+}
+func (tool *BashTool) tryRunReadBash(cmd string, dir string) (*BashRes, error) {
+	binarys, err := ExtractAllBinaries(cmd)
+	if err != nil {
+		return nil, err
+	}
+	for _, name := range binarys {
+		if _, exist := readOnlyWhitelist[name]; !exist {
+			return nil, fmt.Errorf("command '%s' not in white list, can not run", name)
+		}
+	}
+	runCmd := exec.Command("bash", "-c", cmd)
+	if dir != "" {
+		runCmd.Dir = dir
+	}
+	output, err := runCmd.CombinedOutput()
+	exitCode := 0
+	if err != nil {
+		if exitError, ok := err.(*exec.ExitError); ok {
+			exitCode = exitError.ExitCode()
+		} else {
+			return nil, err // System error (e.g., bash not found)
+		}
+	}
+	bashResult := &BashRes{
+		ExitCode: exitCode,
+		Output:   string(output),
+	}
+	return bashResult, nil
+}
+func (tool *BashTool) runBashWithDiff(cmd string, dir string) (*BashRes, error) {
+	err := tool.syncRepo()
+	if err != nil {
+		return nil, err
+	}
+	runCmd := exec.Command("bash", "-c", cmd)
+	if dir != "" {
+		runCmd.Dir = dir
+	}
+	output, err := runCmd.CombinedOutput()
+	exitCode := 0
+	if err != nil {
+		if exitError, ok := err.(*exec.ExitError); ok {
+			exitCode = exitError.ExitCode()
+		} else {
+			return nil, err // System error (e.g., bash not found)
+		}
+	}
+	bashResult := &BashRes{
+		ExitCode: exitCode,
+		Output:   string(output),
+	}
+	tool.diffOutput(bashResult)
+
+	return bashResult, nil
+}
+func (tool *BashTool) syncRepo() error {
+	addCmd := exec.Command("git", "add", "--all")
+	addCmd.Dir = tool.gitRepoPath
+	addCmd.Env = append(os.Environ(), "GIT_INDEX_FILE="+tool.tempIndexFile)
+	if err := addCmd.Run(); err != nil {
+		return fmt.Errorf("failed to add files: %v", err)
+	}
+
+	refreshCmd := exec.Command("git", "update-index", "--refresh", "--really-refresh")
+	refreshCmd.Dir = tool.gitRepoPath
+	refreshCmd.Env = append(os.Environ(), "GIT_INDEX_FILE="+tool.tempIndexFile)
+	_ = refreshCmd.Run()
+	return nil
+}
+
+func (tool *BashTool) diffOutput(res *BashRes) {
+	cmd := exec.Command("git", "status", "--porcelain=v1", "--untracked-files=all")
+	cmd.Dir = tool.gitRepoPath
+	cmd.Env = append(os.Environ(), "GIT_INDEX_FILE="+tool.tempIndexFile)
+
+	out, _ := cmd.Output()
+	lines := strings.Split(string(out), "\n")
+
+	for _, line := range lines {
+		if len(line) < 4 {
+			continue
+		}
+
+		status := line[:2]
+		filename := line[3:]
+
+		switch status {
+		case " M":
+			res.ModifiedFiles = append(res.ModifiedFiles, filename)
+		case " D":
+			res.DeletedFiles = append(res.ModifiedFiles, filename)
+		case "??":
+			res.CreatedFiles = append(res.ModifiedFiles, filename)
+		}
+	}
 }

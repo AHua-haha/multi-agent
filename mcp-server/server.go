@@ -8,10 +8,6 @@ import (
 	"github.com/sashabaranov/go-openai"
 )
 
-func NewMCPServer() *server.MCPServer {
-	return nil
-}
-
 type Server struct {
 	projectRoot string
 	bashTool    service.BashTool
@@ -21,6 +17,7 @@ type Server struct {
 func NewServer(projectRoot string) (*Server, error) {
 	s := &Server{
 		projectRoot: projectRoot,
+		mcpServer:   server.NewMCPServer("file editing and bash", "v1.0", server.WithToolCapabilities(true)),
 	}
 	err := s.bashTool.AddRepo(projectRoot)
 	if err != nil {
@@ -42,4 +39,12 @@ func NewServer(projectRoot string) (*Server, error) {
 		}
 	}
 	return s, nil
+}
+
+func (s *Server) Run() error {
+	err := server.ServeStdio(s.mcpServer)
+	if err != nil {
+		return err
+	}
+	return nil
 }

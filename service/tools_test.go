@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"multi-agent/service"
 	"testing"
+	_ "multi-agent/shared"
 )
 
 func TestExtractAllBinaries(t *testing.T) {
@@ -33,7 +34,7 @@ func TestExtractAllBinaries(t *testing.T) {
 func TestBashRun(t *testing.T) {
 	t.Run("test extract binary", func(t *testing.T) {
 		test := service.BashTool{}
-		test.AddRepo("/root/workspace/multi-agent")
+		test.AddRepo("/root/multi-agent")
 		testCashs := []string{
 			"ls | grep go",
 			"pwd",

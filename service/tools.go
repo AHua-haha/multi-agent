@@ -16,6 +16,20 @@ import (
 	"mvdan.cc/sh/v3/syntax"
 )
 
+func CreateTempFIle(dir string, pattern string) (string, error) {
+	// "" uses the default system temp directory (usually /tmp on Linux)
+	tmpFile, err := os.CreateTemp(dir, pattern)
+	if err != nil {
+		return "", fmt.Errorf("failed to create temp file: %w", err)
+	}
+
+	if err := tmpFile.Close(); err != nil {
+		return "", fmt.Errorf("failed to close temp file: %w", err)
+	}
+
+	return tmpFile.Name(), nil
+}
+
 func ExtractAllBinaries(shellCmd string) ([]string, error) {
 	parser := syntax.NewParser()
 	file, err := parser.Parse(strings.NewReader(shellCmd), "")
@@ -173,6 +187,14 @@ var readOnlyWhitelist = map[string]bool{
 	"cd": true, "rg": true,
 }
 
+type RunMode int
+
+const (
+	Exit RunMode = iota
+	DirectRun
+	DiffRun
+)
+
 type BashTool struct {
 	tempIndexFile string
 	gitRepoPath   string
@@ -187,7 +209,11 @@ type BashRes struct {
 }
 
 func (tool *BashTool) AddRepo(path string) error {
-	tmpFile := filepath.Join(os.TempDir(), "agent_index_shared")
+	tmpFile, err := CreateTempFIle("", "agent_temp_index_")
+	if err != nil {
+		log.Error().Err(err).Msg("Create temp file failed")
+		return err
+	}
 
 	tool.gitRepoPath = path
 	tool.tempIndexFile = tmpFile
@@ -195,7 +221,7 @@ func (tool *BashTool) AddRepo(path string) error {
 	initCmd := exec.Command("git", "read-tree", "HEAD")
 	initCmd.Dir = tool.gitRepoPath
 	initCmd.Env = append(os.Environ(), "GIT_INDEX_FILE="+tool.tempIndexFile)
-	err := initCmd.Run()
+	err = initCmd.Run()
 	if err != nil {
 		log.Error().Err(err).Any("cmd", initCmd.String()).Msg("init cmd run failed")
 		return err
@@ -204,22 +230,38 @@ func (tool *BashTool) AddRepo(path string) error {
 	return nil
 }
 func (tool *BashTool) Run(cmd string, dir string) (*BashRes, error) {
-	res, _ := tool.tryRunReadBash(cmd, dir)
-	if res != nil {
-		return res, nil
+	runMode, err := tool.chooseRunMode(cmd, dir)
+	if err != nil {
+		log.Error().Err(err).Any("cmd", cmd).Msg("choose run mode for shell cmd failed")
+		return nil, err
 	}
-	return tool.runBashWithDiff(cmd, dir)
+	var res *BashRes
+	switch runMode {
+	case DirectRun:
+		res, err = tool.DirectRun(cmd, dir)
+	case DiffRun:
+		res, err = tool.DiffRun(cmd, dir)
+	}
+	if err != nil {
+		log.Error().Err(err).Any("cmd", cmd).Msg("Executing shell cmd failed")
+		return nil, err
+	}
+	log.Info().Any("cmd", cmd).Any("Run Mode", runMode).Msg("Executing shell cmd success")
+	return res, nil
 }
-func (tool *BashTool) tryRunReadBash(cmd string, dir string) (*BashRes, error) {
+func (tool *BashTool) chooseRunMode(cmd string, dir string) (RunMode, error) {
 	binarys, err := ExtractAllBinaries(cmd)
 	if err != nil {
-		return nil, err
+		return Exit, err
 	}
 	for _, name := range binarys {
 		if _, exist := readOnlyWhitelist[name]; !exist {
-			return nil, fmt.Errorf("command '%s' not in white list, can not run", name)
+			return DiffRun, nil
 		}
 	}
+	return DirectRun, nil
+}
+func (tool *BashTool) DirectRun(cmd string, dir string) (*BashRes, error) {
 	runCmd := exec.Command("bash", "-c", cmd)
 	if dir != "" {
 		runCmd.Dir = dir
@@ -239,7 +281,7 @@ func (tool *BashTool) tryRunReadBash(cmd string, dir string) (*BashRes, error) {
 	}
 	return bashResult, nil
 }
-func (tool *BashTool) runBashWithDiff(cmd string, dir string) (*BashRes, error) {
+func (tool *BashTool) DiffRun(cmd string, dir string) (*BashRes, error) {
 	err := tool.syncRepo()
 	if err != nil {
 		return nil, err

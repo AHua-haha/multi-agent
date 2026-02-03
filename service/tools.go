@@ -70,7 +70,7 @@ func ViewFile(file string, lines [][]int) (string, error) {
 	for idx := 0; idx < len(validLines); {
 		start := validLines[idx][0]
 		end := validLines[idx][1]
-		for validLines[idx][0] <= end {
+		for idx < len(validLines) && validLines[idx][0] <= end+10 {
 			end = max(end, validLines[idx][1])
 			idx++
 		}
@@ -81,21 +81,34 @@ func ViewFile(file string, lines [][]int) (string, error) {
 		return "", err
 	}
 	defer f.Close()
-	scanner := bufio.NewScanner(f)
 	idx := 0
+	scanner := bufio.NewScanner(f)
+	if !scanner.Scan() {
+		return builder.String(), nil
+	}
 	currentLine := 1
 
-	for scanner.Scan() {
-		if currentLine >= mergeLines[idx][0] && currentLine <= mergeLines[idx][1] {
-			builder.WriteString(fmt.Sprintf("%d|%s\n", currentLine, scanner.Text()))
+RangeIter:
+	for idx < len(mergeLines) {
+		start := mergeLines[idx][0]
+		end := mergeLines[idx][1]
+		if currentLine < start {
+			builder.WriteString(fmt.Sprintf("# ... [lines %d-%d omitted] ...\n", currentLine, start-1))
 		}
-		if currentLine == mergeLines[idx][1] {
-			idx++
-			if idx >= len(mergeLines) {
-				break
+		for currentLine != start {
+			if !scanner.Scan() {
+				break RangeIter
 			}
+			currentLine++
 		}
-		currentLine++
+		for currentLine <= end {
+			builder.WriteString(fmt.Sprintf("%4d | %s\n", currentLine, scanner.Text()))
+			if !scanner.Scan() {
+				break RangeIter
+			}
+			currentLine++
+		}
+		idx++
 	}
 	return builder.String(), nil
 }

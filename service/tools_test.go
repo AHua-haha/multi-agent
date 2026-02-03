@@ -3,8 +3,8 @@ package service_test
 import (
 	"fmt"
 	"multi-agent/service"
-	"testing"
 	_ "multi-agent/shared"
+	"testing"
 )
 
 func TestExtractAllBinaries(t *testing.T) {
@@ -49,4 +49,31 @@ func TestBashRun(t *testing.T) {
 			fmt.Printf("%v\n", res)
 		}
 	})
+}
+
+func TestViewFile(t *testing.T) {
+	tests := []struct {
+		name  string // description of this test case
+		file  string
+		lines [][]int
+	}{
+		{
+			name: "test one file",
+			file: "/root/multi-agent/service/tools_test.go",
+			lines: [][]int{
+				{1, 4},
+				{15, 34},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, gotErr := service.ViewFile(tt.file, tt.lines)
+			if gotErr != nil {
+				fmt.Printf("gotErr: %v\n", gotErr)
+			} else {
+				fmt.Printf("%v\n", got)
+			}
+		})
+	}
 }

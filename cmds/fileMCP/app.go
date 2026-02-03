@@ -8,7 +8,7 @@ import (
 )
 
 func main() {
-	s, err := mcpserver.NewServer("")
+	s, err := mcpserver.NewServer("/root/multi-agent")
 	if err != nil {
 		log.Error().Err(err).Msg("Create server failed")
 		return

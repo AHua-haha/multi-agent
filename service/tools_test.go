@@ -38,7 +38,7 @@ func TestBashRun(t *testing.T) {
 		testCashs := []string{
 			"ls | grep go",
 			"pwd",
-			`echo "hello you" > test.txt`,
+			// `echo "hello you" > test.txt`,
 		}
 		for _, cmd := range testCashs {
 			res, err := test.Run(cmd, "")

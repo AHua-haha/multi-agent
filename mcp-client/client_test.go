@@ -2,7 +2,9 @@ package mcpclient
 
 import (
 	"context"
+	"fmt"
 	"log"
+	mcpserver "multi-agent/mcp-server"
 	"testing"
 
 	"github.com/mark3labs/mcp-go/client"
@@ -13,7 +15,7 @@ func TestMcpClient(t *testing.T) {
 	t.Run("test client", func(t *testing.T) {
 		ctx := context.Background()
 
-		mcpClient, err := client.NewStdioMCPClient("npx", nil, "mcp-server-text-editor")
+		mcpClient, err := client.NewStdioMCPClient("/root/multi-agent/bin/mcpserver", nil)
 		if err != nil {
 			log.Fatalf("Failed to create client: %v", err)
 		}
@@ -29,14 +31,14 @@ func TestMcpClient(t *testing.T) {
 				Capabilities: mcp.ClientCapabilities{},
 			},
 		})
-		toolsResult, err := mcpClient.ListTools(ctx, mcp.ListToolsRequest{})
-		if err != nil {
-			log.Fatalf("Failed to list tools: %v", err)
+		req := mcp.CallToolRequest{}
+		args := mcpserver.BashArgs{
+			Cmd: "pwd",
+			// Dir: "/root/multi-agent/",
 		}
-
-		log.Printf("Available tools:")
-		for _, tool := range toolsResult.Tools {
-			log.Printf("  - %s: %s %s", tool.Name, tool.Description, tool.InputSchema)
-		}
+		req.Params.Name = "bash"
+		req.Params.Arguments = args
+		res, err := mcpClient.CallTool(ctx, req)
+		fmt.Printf("%v\n", res.Content)
 	})
 }

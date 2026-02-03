@@ -12,6 +12,23 @@ import (
 	"github.com/sashabaranov/go-openai/jsonschema"
 )
 
+type ViewFileArgs struct {
+	File  string
+	Lines [][]int
+}
+type EditFileArgs struct {
+	File        string
+	UnifiedDiff string
+}
+type CreateFileArgs struct {
+	Path    string
+	Content string
+}
+type BashArgs struct {
+	Cmd string
+	Dir string
+}
+
 func (s *Server) viewfileTool() (openai.FunctionDefinition, server.ToolHandlerFunc) {
 	def := openai.FunctionDefinition{
 		Name:        "view_file",
@@ -39,10 +56,7 @@ func (s *Server) viewfileTool() (openai.FunctionDefinition, server.ToolHandlerFu
 		},
 	}
 	handler := func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		var args struct {
-			File  string
-			Lines [][]int
-		}
+		var args ViewFileArgs
 		err := request.BindArguments(&args)
 		if err != nil {
 			return nil, err
@@ -75,10 +89,7 @@ func (s *Server) editfileTool() (openai.FunctionDefinition, server.ToolHandlerFu
 		},
 	}
 	handler := func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		var args struct {
-			File        string
-			UnifiedDiff string
-		}
+		var args EditFileArgs
 		err := request.BindArguments(&args)
 		if err != nil {
 			return nil, err
@@ -111,10 +122,7 @@ func (s *Server) createfileTool() (openai.FunctionDefinition, server.ToolHandler
 		},
 	}
 	handler := func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		var args struct {
-			Path    string
-			Content string
-		}
+		var args CreateFileArgs
 		err := request.BindArguments(&args)
 		if err != nil {
 			return nil, err
@@ -147,10 +155,7 @@ func (s *Server) runbashTool() (openai.FunctionDefinition, server.ToolHandlerFun
 		},
 	}
 	handler := func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		var args struct {
-			Cmd string
-			Dir string
-		}
+		var args BashArgs
 		err := request.BindArguments(&args)
 		if err != nil {
 			return nil, err

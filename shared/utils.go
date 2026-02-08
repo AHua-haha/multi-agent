@@ -17,3 +17,13 @@ func ConvertToMcpTool(def openai.FunctionDefinition) (mcp.Tool, error) {
 	tool := mcp.NewToolWithRawSchema(def.Name, def.Description, data)
 	return tool, nil
 }
+
+func ConvertToFunctionDefinition(def mcp.Tool) openai.FunctionDefinition {
+	res := openai.FunctionDefinition{
+		Name:        def.Name,
+		Description: def.Description,
+		Parameters:  def.InputSchema,
+		Strict:      true,
+	}
+	return res
+}

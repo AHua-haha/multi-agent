@@ -8,8 +8,8 @@ import (
 
 type ToolEndPoint struct {
 	Name    string
-	def     openai.FunctionDefinition
-	handler func(args string) string
+	Def     openai.FunctionDefinition
+	Handler func(args string) (string, error)
 }
 
 type ToolDispatcher struct {
@@ -23,7 +23,7 @@ func (td *ToolDispatcher) Run(toolCall openai.ToolCall) openai.ChatCompletionMes
 		ToolCallID: toolCall.ID,
 	}
 	if exist {
-		res.Content = endpoint.handler(toolCall.Function.Arguments)
+		res.Content = endpoint.Handler(toolCall.Function.Arguments)
 	} else {
 		res.Content = fmt.Sprintf("Run tool call failed, Can not find tool with name %s", toolCall.Function.Name)
 	}
@@ -35,7 +35,7 @@ func (td *ToolDispatcher) GetTools() []openai.Tool {
 	for _, endpoint := range td.toolMap {
 		res = append(res, openai.Tool{
 			Type:     openai.ToolTypeFunction,
-			Function: &endpoint.def,
+			Function: &endpoint.Def,
 		})
 	}
 	return res

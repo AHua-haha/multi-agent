@@ -46,8 +46,15 @@ func (item *TaskItem) formatString() string {
 }
 
 type TaskMgr struct {
+	UserGoal    string
 	PreTasks    []TaskItem
 	CurrentTask *TaskItem
+}
+
+func NewTaskMgr(userGoal string) *TaskMgr {
+	return &TaskMgr{
+		UserGoal: userGoal,
+	}
 }
 
 func (mgr *TaskMgr) createTask(goal string, answerSpec string, contextSpec string) error {
@@ -78,8 +85,29 @@ func (mgr *TaskMgr) finishTask(answer string, contexts []ContextItem) error {
 	return nil
 }
 
-func (mgr *TaskMgr) getTaskContextPrompt() string {
+func (mgr *TaskMgr) GetTaskContextPrompt() string {
+	intro := `
+Below is the record of completed tasks and current in progress task with the result of each task. The result of each task includes conclusion and context information.
+`
+	instruction := `
+### INSTRUCTION
+Your job is to achieve the User Primary Goal,
+Examine the previous task information:
+- if there is a current in progress task, use the tools to accomplish the task.
+- if there is not a in progress task, think about what to do next to achieve the User Primary Goal, create the next atomic task.
+- You MUST finish the current task before you create the next task.
+
+**Task Proposal:**
+- ** Atomic Task **: each task should be atomic, each task should have only one goal, do not create a task with multiple goals, try to divide it to atomic task.
+- ** Expected Output **: when create the atomic task, you MUST explicitly define the Expected Output. You can define two kinds of output, Answer and Context.
+- ** Answer **: the task output can be short and concise facts and conclusions.
+- ** Context **: the task output can be background context information like file content.
+
+IMPORTANT: You MUST explicitly define the Expected Output of each task.
+`
 	var builder strings.Builder
+	builder.WriteString(fmt.Sprintf("** USER PRIMARY GOAL **: %s\n", mgr.UserGoal))
+	builder.WriteString(intro)
 	if len(mgr.PreTasks) != 0 {
 		builder.WriteString("** Completed Tasks **\n")
 		for _, task := range mgr.PreTasks {
@@ -95,6 +123,7 @@ func (mgr *TaskMgr) getTaskContextPrompt() string {
 		builder.WriteString(mgr.CurrentTask.formatString())
 	}
 	builder.WriteByte('\n')
+	builder.WriteString(instruction)
 	return builder.String()
 }
 

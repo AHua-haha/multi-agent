@@ -1,9 +1,12 @@
 package service
 
 import (
+	"encoding/json"
 	"fmt"
-	"multi-agent/shared"
 	"strings"
+
+	"github.com/sashabaranov/go-openai"
+	"github.com/sashabaranov/go-openai/jsonschema"
 )
 
 type TaskItem struct {
@@ -14,7 +17,12 @@ type TaskItem struct {
 	ContextSpec string
 
 	Answer  string
-	Context []shared.ContextItem
+	Context []ContextItem
+}
+
+type ContextItem struct {
+	ID   int
+	Desc string
 }
 
 func (item *TaskItem) formatString() string {
@@ -56,13 +64,13 @@ func (mgr *TaskMgr) createTask(goal string, answerSpec string, contextSpec strin
 	return nil
 }
 
-func (mgr *TaskMgr) finishTask(anser string, contexts []shared.ContextItem) error {
+func (mgr *TaskMgr) finishTask(answer string, contexts []ContextItem) error {
 	if mgr.CurrentTask == nil {
 		return fmt.Errorf("There is no current task, can not finish task")
 	}
 
 	mgr.CurrentTask.Completed = true
-	mgr.CurrentTask.Answer = anser
+	mgr.CurrentTask.Answer = answer
 	mgr.CurrentTask.Context = contexts
 	mgr.PreTasks = append(mgr.PreTasks, *mgr.CurrentTask)
 
@@ -88,4 +96,96 @@ func (mgr *TaskMgr) getTaskContextPrompt() string {
 	}
 	builder.WriteByte('\n')
 	return builder.String()
+}
+
+type CreateTaskArgs struct {
+	Goal        string
+	AnswerSpec  string
+	ContextSpec string
+}
+type FinishTaskArgs struct {
+	Answer string
+	// Context []ContextItem
+}
+
+func (mgr *TaskMgr) CreateTaskTool() ToolEndPoint {
+	def := openai.FunctionDefinition{
+		Name:        "create_task",
+		Description: "Defines a structured task by outlining the objective, the specific target conclusion to be reached, and the background information that the agent want.",
+		Parameters: jsonschema.Definition{
+			Type: jsonschema.Object,
+			Properties: map[string]jsonschema.Definition{
+				"Goal": {
+					Type:        jsonschema.String,
+					Description: "The high-level objective of the task.",
+				},
+				"AnswerSpec": {
+					Type:        jsonschema.String,
+					Description: "A short and concise description of the specific target conclusion the agent is trying to find. Can be empty if agent only need the context infomation",
+				},
+				"ContextSpec": {
+					Type:        jsonschema.String,
+					Description: "A description of the background information and data points the agent needs. Can be empty if the agent only need the final conclusion",
+				},
+			},
+			Required: []string{"Goal", "AnswerSpec", "ContextSpec"},
+		},
+	}
+	Handler := func(args string) (string, error) {
+		var para CreateTaskArgs
+		err := json.Unmarshal([]byte(args), &para)
+		if err != nil {
+			return "", err
+		}
+		err = mgr.createTask(para.Goal, para.AnswerSpec, para.ContextSpec)
+		if err != nil {
+			return "", err
+		}
+		return "", nil
+	}
+	endpoint := ToolEndPoint{
+		Name:    "create_file",
+		Def:     def,
+		Handler: Handler,
+	}
+	return endpoint
+}
+
+func (mgr *TaskMgr) FinishTaskTool() ToolEndPoint {
+	def := openai.FunctionDefinition{
+		Name:        "finish_task",
+		Description: "Finish the current in progress task with the answer and context infomation",
+		Parameters: jsonschema.Definition{
+			Type: jsonschema.Object,
+			Properties: map[string]jsonschema.Definition{
+				"Answer": {
+					Type:        jsonschema.String,
+					Description: "The short and concise conclusions or answers which answer the AnswerSpec of the current in progress task.",
+				},
+				// "Context": {
+				// 	Type:        jsonschema.String,
+				// 	Description: "",
+				// },
+			},
+			Required: []string{"Answer"},
+		},
+	}
+	Handler := func(args string) (string, error) {
+		var para FinishTaskArgs
+		err := json.Unmarshal([]byte(args), &para)
+		if err != nil {
+			return "", err
+		}
+		err = mgr.finishTask(para.Answer, nil)
+		if err != nil {
+			return "", err
+		}
+		return "", nil
+	}
+	endpoint := ToolEndPoint{
+		Name:    "finish_task",
+		Def:     def,
+		Handler: Handler,
+	}
+	return endpoint
 }

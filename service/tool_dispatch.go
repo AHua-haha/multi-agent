@@ -23,7 +23,11 @@ func (td *ToolDispatcher) Run(toolCall openai.ToolCall) openai.ChatCompletionMes
 		ToolCallID: toolCall.ID,
 	}
 	if exist {
-		res.Content = endpoint.Handler(toolCall.Function.Arguments)
+		content, err := endpoint.Handler(toolCall.Function.Arguments)
+		if err != nil {
+			res.Content = content
+		} else {
+		}
 	} else {
 		res.Content = fmt.Sprintf("Run tool call failed, Can not find tool with name %s", toolCall.Function.Name)
 	}

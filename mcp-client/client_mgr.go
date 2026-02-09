@@ -16,6 +16,12 @@ type ClientMgr struct {
 	clientMap map[string]*client.Client
 }
 
+func NewclientMgr() *ClientMgr {
+	return &ClientMgr{
+		clientMap: map[string]*client.Client{},
+	}
+}
+
 func (mgr *ClientMgr) CloseByName(name string) error {
 	client, exist := mgr.clientMap[name]
 	if !exist {
@@ -66,7 +72,25 @@ func (mgr *ClientMgr) NewMCPClient(command string, env []string, args ...string)
 	return nil
 }
 
-func (mgr *ClientMgr) LoadTools(c *client.Client) ([]service.ToolEndPoint, error) {
+func (mgr *ClientMgr) LoadAllTools() ([]service.ToolEndPoint, error) {
+	var endpoint []service.ToolEndPoint
+	var errorList []error
+	for _, c := range mgr.clientMap {
+		res, err := mgr.loadTools(c)
+		if err != nil {
+			errorList = append(errorList, err)
+		} else {
+			endpoint = append(endpoint, res...)
+		}
+	}
+	err := errors.Join(errorList...)
+	if err != nil {
+		return nil, err
+	}
+	return endpoint, nil
+}
+
+func (mgr *ClientMgr) loadTools(c *client.Client) ([]service.ToolEndPoint, error) {
 	res, err := c.ListTools(context.Background(), mcp.ListToolsRequest{})
 	if err != nil {
 		return nil, err

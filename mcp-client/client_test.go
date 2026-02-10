@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	mcpserver "multi-agent/mcp-server"
 	"testing"
 
 	"github.com/mark3labs/mcp-go/client"
@@ -33,13 +32,17 @@ func TestMcpClient(t *testing.T) {
 			},
 		})
 		req := mcp.CallToolRequest{}
-		args := mcpserver.BashArgs{
-			Cmd: "pwd",
-			// Dir: "/root/multi-agent/",
-		}
+		// args := mcpserver.BashArgs{
+		// 	Cmd: "pwd",
+		// 	// Dir: "/root/multi-agent/",
+		// }
+		args := `{"Cmd": "ls -la /root/multi-agent"}`
 		req.Params.Name = "bash"
-		req.Params.Arguments = args
+		req.Params.Arguments = json.RawMessage(args)
 		res, err := mcpClient.CallTool(ctx, req)
+		if err != nil {
+			fmt.Printf("err: %v\n", err)
+		}
 		fmt.Printf("%v\n", res.Content)
 	})
 }

@@ -142,11 +142,11 @@ func (s *Server) runbashTool() (openai.FunctionDefinition, server.ToolHandlerFun
 		Parameters: jsonschema.Definition{
 			Type: jsonschema.Object,
 			Properties: map[string]jsonschema.Definition{
-				"cmd": {
+				"Cmd": {
 					Type:        jsonschema.String,
 					Description: "The full bash command string to execute (e.g., 'go test ./...', 'ls -la', etc.).",
 				},
-				"dir": {
+				"Dir": {
 					Type:        jsonschema.String,
 					Description: "The working directory in which to execute the command. Defaults to the current project root if not specified.",
 				},

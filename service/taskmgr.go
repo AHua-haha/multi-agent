@@ -51,10 +51,10 @@ type TaskMgr struct {
 	CurrentTask *TaskItem
 }
 
-func NewTaskMgr(userGoal string) *TaskMgr {
-	return &TaskMgr{
-		UserGoal: userGoal,
-	}
+func (mgr *TaskMgr) Reset(userGoal string) {
+	mgr.UserGoal = userGoal
+	mgr.PreTasks = nil
+	mgr.CurrentTask = nil
 }
 
 func (mgr *TaskMgr) createTask(goal string, answerSpec string, contextSpec string) error {
@@ -173,7 +173,7 @@ func (mgr *TaskMgr) CreateTaskTool() ToolEndPoint {
 		return "", nil
 	}
 	endpoint := ToolEndPoint{
-		Name:    "create_file",
+		Name:    "create_task",
 		Def:     def,
 		Handler: Handler,
 	}

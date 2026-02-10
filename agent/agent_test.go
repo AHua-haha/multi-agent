@@ -24,7 +24,7 @@ func TestReactAgent_chat(t *testing.T) {
 				Messages: []openai.ChatCompletionMessage{
 					{
 						Role:    openai.ChatMessageRoleUser,
-						Content: "Write a short Go function to calculate Fibonacci numbers.",
+						Content: "tell me your model version and your knowledge cut off time",
 					},
 				},
 			},
@@ -32,6 +32,6 @@ func TestReactAgent_chat(t *testing.T) {
 		if err != nil {
 			fmt.Printf("err: %v\n", err)
 		}
-		fmt.Printf("resp: %v\n", resp)
+		fmt.Printf("resp: %v\n", resp.Choices[0].Message.Content)
 	})
 }

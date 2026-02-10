@@ -1,6 +1,8 @@
 package service
 
 import (
+	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -14,7 +16,26 @@ type ToolEndPoint struct {
 }
 
 type ToolDispatcher struct {
-	toolMap map[string]*ToolEndPoint
+	toolMap map[string]ToolEndPoint
+}
+
+func NewToolDispatcher() *ToolDispatcher {
+	return &ToolDispatcher{
+		toolMap: map[string]ToolEndPoint{},
+	}
+}
+
+func (td *ToolDispatcher) RegisterToolEndpoint(endpoints ...ToolEndPoint) error {
+	err := []error{}
+	for _, endpoint := range endpoints {
+		_, exist := td.toolMap[endpoint.Name]
+		if exist {
+			err = append(err, fmt.Errorf("tool with name %s already exist", endpoint.Name))
+		} else {
+			td.toolMap[endpoint.Name] = endpoint
+		}
+	}
+	return errors.Join(err...)
 }
 
 func (td *ToolDispatcher) Run(toolCall openai.ToolCall) openai.ChatCompletionMessage {
@@ -54,4 +75,12 @@ func (td *ToolDispatcher) GetTools() []openai.Tool {
 		})
 	}
 	return res
+}
+
+func (td *ToolDispatcher) DebugTools() {
+	for _, tool := range td.toolMap {
+		fmt.Printf("tool.Name: %v\n", tool.Name)
+		data, _ := json.Marshal(tool.Def)
+		fmt.Printf("%s\n", string(data))
+	}
 }

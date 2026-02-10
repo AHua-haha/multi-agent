@@ -2,6 +2,7 @@ package mcpclient
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"multi-agent/service"
@@ -104,7 +105,7 @@ func (mgr *ClientMgr) loadTools(c *client.Client) ([]service.ToolEndPoint, error
 				res, err := c.CallTool(context.Background(), mcp.CallToolRequest{
 					Params: mcp.CallToolParams{
 						Name:      tool.Name,
-						Arguments: args,
+						Arguments: json.RawMessage(args),
 					},
 				})
 				if err != nil {

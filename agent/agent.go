@@ -58,6 +58,17 @@ func (a *ReactAgent) chat() (*openai.ChatCompletionChoice, error) {
 		Content: a.taskMgr.GetTaskContextPrompt(),
 	})
 	msgs = append(msgs, a.actionStack...)
+	if a.taskMgr.CurrentTask == nil {
+		msgs = append(msgs, openai.ChatCompletionMessage{
+			Role:    openai.ChatMessageRoleUser,
+			Content: service.CreateTaskInstruct,
+		})
+	} else {
+		msgs = append(msgs, openai.ChatCompletionMessage{
+			Role:    openai.ChatMessageRoleUser,
+			Content: service.DoingTaskInstruct,
+		})
+	}
 	req := openai.ChatCompletionRequest{
 		Model:    "MiniMax-M2.1",
 		Messages: msgs,
@@ -86,6 +97,9 @@ func (a *ReactAgent) handleToolCall(toolCalls []openai.ToolCall) {
 	}
 	if toolCalls[len(toolCalls)-1].Function.Name == "finish_task" {
 		a.actionStack = nil
+		writer.WriteString("<TASK INFO>\n")
+		writer.WriteString(a.taskMgr.GetTaskContextPrompt())
+		writer.WriteString("<TASK INFO>\n")
 	}
 }
 
@@ -113,11 +127,13 @@ func (a *ReactAgent) run(input string) {
 		if resp.FinishReason == openai.FinishReasonStop {
 			break
 		}
-		writer.WriteString("<MSG>\n")
+		writer.WriteString("<MSG> clean thinking\n")
 		writer.WriteString(fmt.Sprintf("Role: %s\n", resp.Message.Role))
 		writer.WriteString(fmt.Sprintf("content:\n%s\n", resp.Message.Content))
 		writer.WriteString("</MSG>\n")
+		resp.Message.Content = ""
 		a.actionStack = append(a.actionStack, resp.Message)
 		a.handleToolCall(resp.Message.ToolCalls)
+		writer.Flush()
 	}
 }

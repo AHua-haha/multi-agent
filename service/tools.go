@@ -81,6 +81,8 @@ func ViewFile(file string, lines [][]int) (string, error) {
 		return "", err
 	}
 	defer f.Close()
+	builder.WriteString("```text\n")
+	defer builder.WriteString("```\n")
 	idx := 0
 	scanner := bufio.NewScanner(f)
 	if !scanner.Scan() {

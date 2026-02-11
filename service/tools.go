@@ -217,10 +217,10 @@ type BashTool struct {
 
 type BashRes struct {
 	ExitCode      int      `json:"exit_code"`
-	Output        string   `json:"output"`         // Combined Stdout and Stderr
-	ModifiedFiles []string `json:"modified_files"` // Files that existed and changed
-	CreatedFiles  []string `json:"created_files"`  // Brand new files
-	DeletedFiles  []string `json:"deleted_files"`  // Files removed
+	Output        string   `json:"output"`                   // Combined Stdout and Stderr
+	ModifiedFiles []string `json:"modified_files,omitempty"` // Files that existed and changed
+	CreatedFiles  []string `json:"created_files,omitempty"`  // Brand new files
+	DeletedFiles  []string `json:"deleted_files,omitempty"`
 }
 
 func (tool *BashTool) AddRepo(path string) error {

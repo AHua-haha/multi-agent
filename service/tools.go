@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
+	"multi-agent/shared"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -55,7 +56,6 @@ func ExtractAllBinaries(shellCmd string) ([]string, error) {
 }
 
 func ViewFile(file string, lines [][]int) (string, error) {
-	var builder strings.Builder
 
 	validLines := [][]int{}
 	for _, line := range lines {
@@ -66,6 +66,12 @@ func ViewFile(file string, lines [][]int) (string, error) {
 	sort.Slice(validLines, func(i, j int) bool {
 		return validLines[i][0] < validLines[j][0]
 	})
+	var builder strings.Builder
+	linecnt, err := shared.CountLines(file)
+	if err != nil {
+		return "", err
+	}
+	builder.WriteString(fmt.Sprintf("File %s total lines: %d\n", file, linecnt))
 	mergeLines := [][]int{}
 	for idx := 0; idx < len(validLines); {
 		start := validLines[idx][0]
@@ -82,10 +88,10 @@ func ViewFile(file string, lines [][]int) (string, error) {
 	}
 	defer f.Close()
 	builder.WriteString("```text\n")
-	defer builder.WriteString("```\n")
 	idx := 0
 	scanner := bufio.NewScanner(f)
 	if !scanner.Scan() {
+		builder.WriteString("```\n")
 		return builder.String(), nil
 	}
 	currentLine := 1
@@ -112,6 +118,7 @@ RangeIter:
 		}
 		idx++
 	}
+	builder.WriteString("```\n")
 	return builder.String(), nil
 }
 

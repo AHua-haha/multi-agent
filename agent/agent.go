@@ -125,6 +125,9 @@ func (a *ReactAgent) run(input string) {
 			break
 		}
 		if resp.FinishReason == openai.FinishReasonStop {
+			writer.WriteString("FINAL RESP:\n")
+			writer.WriteString(fmt.Sprintf("Role: %s\n", resp.Message.Role))
+			writer.WriteString(fmt.Sprintf("content:\n%s\n", resp.Message.Content))
 			break
 		}
 		writer.WriteString("<MSG> clean thinking\n")

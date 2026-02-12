@@ -10,11 +10,11 @@ import (
 )
 
 type TaskItem struct {
-	ID             int
-	Completed      bool
-	Goal           string
-	ConclusionSpec string
-	ContextSpec    string
+	ID            int
+	Completed     bool
+	Goal          string
+	ConclusionReq string
+	ContextReq    string
 
 	Conclusion string
 	Context    []ContextItem
@@ -29,7 +29,7 @@ func (item *TaskItem) formatString() string {
 	var builder strings.Builder
 	builder.WriteString(fmt.Sprintf("Task %d: %s\n", item.ID, item.Goal))
 	if !item.Completed {
-		builder.WriteString(fmt.Sprintf("Conclusions Instruction: %s\nBackground Context Instruction: %s\n", item.ConclusionSpec, item.ContextSpec))
+		builder.WriteString(fmt.Sprintf("Conclusions Requirements:\n%s\nBackground Context Requirements:\n%s\n", item.ConclusionReq, item.ContextReq))
 	} else {
 		if item.Conclusion != "" {
 			builder.WriteString(fmt.Sprintf("Conclusions:\n%s\n", item.Conclusion))
@@ -62,11 +62,11 @@ func (mgr *TaskMgr) createTask(goal string, answerSpec string, contextSpec strin
 		return fmt.Errorf("Current Task %s not finished, can not create new task", mgr.CurrentTask.Goal)
 	}
 	mgr.CurrentTask = &TaskItem{
-		ID:             len(mgr.PreTasks) + 1,
-		Completed:      false,
-		Goal:           goal,
-		ConclusionSpec: answerSpec,
-		ContextSpec:    contextSpec,
+		ID:            len(mgr.PreTasks) + 1,
+		Completed:     false,
+		Goal:          goal,
+		ConclusionReq: answerSpec,
+		ContextReq:    contextSpec,
 	}
 	return nil
 }
@@ -94,21 +94,26 @@ IMPORTANT: do not continue the User Primary Goal unless you call 'finish_task' t
 `
 
 var CreateTaskInstruct = `
-### INSTRUCTION
-You are the **Task Orchestrator Agent**. Your goal is to translate high-level user objectives into precise, atomic, and structured task definitions for a Worker Agent.
-You do not execute actions yourself. Instead, you generate a structured **Task Definition**.
-The most critical part of your definition is the **Expected Output Structure**. You must strictly instruct the Worker Agent to report its findings in two distinct categories.
+Analyze the 'Task History' against the 'User Primary Goal'. You must choose one of two paths:
 
-#### The "Expected Output" Definition
-When defining what the task should return, you must mandate two specific distinct fields:
-1. **Conclusion Instruction (Facts & Direct Results):** - These are the direct facts and conclusions to extract as the output of the task.
-2. **Context Instruction (Background & Meta-Data):** - meta-data or environmental context to observe and record,
+#### PATH A: GOAL NOT COMPLETED (DECOMPOSE & CREATE TASK)
+If information is missing or a multi-step process is still underway:
+1. **Decompose**: Identify the immediate next logical task.
+2. **Create Atomic Task**: Define a single, focused task, the task should have only one goal, the task MUST be atomic, NEVER create too complex task with multiple goals.
+3. **Structured Expected Output Requirements**: Define the expected "Primary Conclusions" and "Background Context" for the task.
+   - NEVER define too complex 'Expected Output', the 'Expected Output' should be simple and focused, 2-3 most essential items is the best.
+   - ** Conclusions Requirements **: These are the direct facts and conclusions to extract as the output of the task.
+   - ** Background Context Requirements **: background context to observe and record,
 
-#### ** Task Decomposition **
-- You must NEVER attempt to solve a complex goal in a single step. Instead, you analyze the TASK_HISTORY, identify the immediate gap in knowledge, and define the smallest possible next task.
-- each task should be atomic, each task should have only one goal, do not create a task with multiple goals, try to divide it to atomic task.
+#### PATH B: GOAL COMPLETED (FINALIZE)
+If all the 'Task History' provide a full answer:
+1. **Synthesize**: Combine all facts into a coherent response.
+2. **Nuance**: Add relevant "Background Context" to provide helpful background or warnings.
+3. **Finalize**: Deliver the final response to the user directly without using the 'finish_task' tool.
 
-Now based on the User Primary Goal and Task History, create the smallest possible next task.
+IMPORTANT: never assign a task that is too complex and have multiple goals, decompose complex goals into the smallest possible units of task.
+IMPORTANT: The 'Eexpected Ooutput Requirements' must be highly focused. Do not ask for "everything." Ask for the 1-2 most critical facts.
+
 `
 
 func (mgr *TaskMgr) GetTaskContextPrompt() string {
@@ -143,9 +148,9 @@ Below is the task history with the result of each task. The result of each task 
 }
 
 type CreateTaskArgs struct {
-	Goal           string
-	ConclusionSpec string
-	ContextSpec    string
+	Goal          string
+	ConclusionReq string
+	ContextReq    string
 }
 type FinishTaskArgs struct {
 	Conclusion string
@@ -163,16 +168,16 @@ func (mgr *TaskMgr) CreateTaskTool() ToolEndPoint {
 					Type:        jsonschema.String,
 					Description: "The high-level objective of the task.",
 				},
-				"ConclusionSpec": {
+				"ConclusionReq": {
 					Type:        jsonschema.String,
-					Description: "Specific instructions on what direct facts to extract as the output of the task, can be empty if do not need",
+					Description: "Specific requirements on what direct facts to extract as the output of the task, can be empty if do not need",
 				},
-				"ContextSpec": {
+				"ContextReq": {
 					Type:        jsonschema.String,
-					Description: "Specific instructions on what meta-data or environmental context to observe and record. can be empty if do not need",
+					Description: "Specific requirements on what background context to observe and record. can be empty if do not need",
 				},
 			},
-			Required: []string{"Goal", "ConclusionSpec", "ContextSpec"},
+			Required: []string{"Goal", "ConclusionReq", "ContextReq"},
 		},
 	}
 	Handler := func(args string) (string, error) {
@@ -181,7 +186,7 @@ func (mgr *TaskMgr) CreateTaskTool() ToolEndPoint {
 		if err != nil {
 			return "", err
 		}
-		err = mgr.createTask(para.Goal, para.ConclusionSpec, para.ContextSpec)
+		err = mgr.createTask(para.Goal, para.ConclusionReq, para.ContextReq)
 		if err != nil {
 			return "", err
 		}
@@ -204,7 +209,7 @@ func (mgr *TaskMgr) FinishTaskTool() ToolEndPoint {
 			Properties: map[string]jsonschema.Definition{
 				"Conclusion": {
 					Type:        jsonschema.String,
-					Description: "The short and concise conclusions and facts required by the task conclusion instruction.",
+					Description: "The short and concise conclusions and facts required by the task conclusion requirements.",
 				},
 				// "Context": {
 				// 	Type:        jsonschema.String,

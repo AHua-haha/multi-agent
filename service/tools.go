@@ -72,6 +72,9 @@ func ViewFile(file string, lines [][]int) (string, error) {
 		return "", err
 	}
 	builder.WriteString(fmt.Sprintf("File %s total lines: %d\n", file, linecnt))
+	if len(validLines) == 0 {
+		builder.WriteString("invalid line ranges\n")
+	}
 	mergeLines := [][]int{}
 	for idx := 0; idx < len(validLines); {
 		start := validLines[idx][0]

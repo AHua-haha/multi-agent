@@ -15,14 +15,41 @@ type ToolEndPoint struct {
 	Handler func(args string) (string, error)
 }
 
+type ToolExecLog struct {
+	ID           int
+	ToolCallName string
+	ToolCallArgs string
+	ToolCallRes  string
+	ToolCallErr  error
+}
+
+func (toolLog *ToolExecLog) formatString() string {
+	var builder strings.Builder
+	builder.WriteString("** Metadata **\n")
+	builder.WriteString(fmt.Sprintf("TOOL_LOG_ID: %d\n", toolLog.ID))
+	builder.WriteString("** Status **\n")
+	if toolLog.ToolCallErr != nil {
+		builder.WriteString(fmt.Sprintf("Execute tool call failed, error: %s\n", toolLog.ToolCallErr))
+	} else {
+		builder.WriteString("Execute tool call success\n")
+		builder.WriteString("** Result **\n")
+		builder.WriteString(toolLog.ToolCallRes)
+	}
+	return builder.String()
+}
+
 type ToolDispatcher struct {
 	toolMap map[string]ToolEndPoint
+	toolLog []*ToolExecLog
 }
 
 func NewToolDispatcher() *ToolDispatcher {
 	return &ToolDispatcher{
 		toolMap: map[string]ToolEndPoint{},
 	}
+}
+func (td *ToolDispatcher) ResetLog() {
+	td.toolLog = nil
 }
 
 func (td *ToolDispatcher) RegisterToolEndpoint(endpoints ...ToolEndPoint) error {
@@ -51,18 +78,15 @@ func (td *ToolDispatcher) Run(toolCall openai.ToolCall) openai.ChatCompletionMes
 	} else {
 		err = fmt.Errorf("Run tool call failed, Can not find tool with name %s", toolCall.Function.Name)
 	}
-	var builder strings.Builder
-	builder.WriteString("### Metadata\n\n")
-	builder.WriteString("### Tool Result\n\n")
-	builder.WriteString("** Status **\n")
-	if err != nil {
-		builder.WriteString(fmt.Sprintf("Execute tool call failed, error: %s\n", err))
-	} else {
-		builder.WriteString("Execute tool call success\n")
-		builder.WriteString("** Result **\n")
-		builder.WriteString(content)
+	log := ToolExecLog{
+		ID:           len(td.toolLog),
+		ToolCallName: toolCall.Function.Name,
+		ToolCallArgs: toolCall.Function.Arguments,
+		ToolCallRes:  content,
+		ToolCallErr:  err,
 	}
-	res.Content = builder.String()
+	td.toolLog = append(td.toolLog, &log)
+	res.Content = log.formatString()
 	return res
 }
 

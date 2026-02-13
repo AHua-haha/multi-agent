@@ -70,7 +70,7 @@ func (a *ReactAgent) chat() (*openai.ChatCompletionChoice, error) {
 		})
 	}
 	req := openai.ChatCompletionRequest{
-		Model:    "MiniMax-M2.1",
+		Model:    "MiniMax-M2.5",
 		Messages: msgs,
 		Tools:    a.toolDispatch.GetTools(),
 	}
@@ -97,6 +97,7 @@ func (a *ReactAgent) handleToolCall(toolCalls []openai.ToolCall) {
 	}
 	if toolCalls[len(toolCalls)-1].Function.Name == "finish_task" {
 		a.actionStack = nil
+		a.toolDispatch.ResetLog()
 		writer.WriteString("<TASK INFO>\n")
 		writer.WriteString(a.taskMgr.GetTaskContextPrompt())
 		writer.WriteString("<TASK INFO>\n")

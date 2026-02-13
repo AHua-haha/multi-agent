@@ -21,8 +21,9 @@ type TaskItem struct {
 }
 
 type ContextItem struct {
-	ID   int
-	Desc string
+	ID      int
+	Desc    string
+	ToolLog *ToolExecLog
 }
 
 func (item *TaskItem) formatString() string {
@@ -47,7 +48,7 @@ func (item *TaskItem) formatString() string {
 
 type TaskMgr struct {
 	UserGoal    string
-	PreTasks    []TaskItem
+	PreTasks    []*TaskItem
 	CurrentTask *TaskItem
 }
 
@@ -55,6 +56,12 @@ func (mgr *TaskMgr) Reset(userGoal string) {
 	mgr.UserGoal = userGoal
 	mgr.PreTasks = nil
 	mgr.CurrentTask = nil
+}
+func (mgr *TaskMgr) FillToolLog(toolLog []*ToolExecLog) {
+	task := mgr.PreTasks[len(mgr.PreTasks)-1]
+	for i := range task.Context {
+		task.Context[i].ToolLog = toolLog[task.Context[i].ID]
+	}
 }
 
 func (mgr *TaskMgr) createTask(goal string, answerSpec string, contextSpec string) error {
@@ -79,7 +86,7 @@ func (mgr *TaskMgr) finishTask(answer string, contexts []ContextItem) error {
 	mgr.CurrentTask.Completed = true
 	mgr.CurrentTask.Conclusion = answer
 	mgr.CurrentTask.Context = contexts
-	mgr.PreTasks = append(mgr.PreTasks, *mgr.CurrentTask)
+	mgr.PreTasks = append(mgr.PreTasks, mgr.CurrentTask)
 
 	mgr.CurrentTask = nil
 	return nil
@@ -154,7 +161,7 @@ type CreateTaskArgs struct {
 }
 type FinishTaskArgs struct {
 	Conclusion string
-	// Context []ContextItem
+	Context    []ContextItem
 }
 
 func (mgr *TaskMgr) CreateTaskTool() ToolEndPoint {
@@ -211,12 +218,25 @@ func (mgr *TaskMgr) FinishTaskTool() ToolEndPoint {
 					Type:        jsonschema.String,
 					Description: "The short and concise conclusions and facts required by the task conclusion requirements.",
 				},
-				// "Context": {
-				// 	Type:        jsonschema.String,
-				// 	Description: "",
-				// },
+				"Context": {
+					Type:        jsonschema.Array,
+					Description: "A list of the tool execute result, which is the output of the task context requirements",
+					Items: &jsonschema.Definition{
+						Type: jsonschema.Object,
+						Properties: map[string]jsonschema.Definition{
+							"ID": {
+								Type:        jsonschema.Integer,
+								Description: "the id of the tool log",
+							},
+							"Desc": {
+								Type:        jsonschema.String,
+								Description: "the description of this background context",
+							},
+						},
+					},
+				},
 			},
-			Required: []string{"Conclusion"},
+			Required: []string{"Conclusion", "Context"},
 		},
 	}
 	Handler := func(args string) (string, error) {
@@ -225,7 +245,7 @@ func (mgr *TaskMgr) FinishTaskTool() ToolEndPoint {
 		if err != nil {
 			return "", err
 		}
-		err = mgr.finishTask(para.Conclusion, nil)
+		err = mgr.finishTask(para.Conclusion, para.Context)
 		if err != nil {
 			return "", err
 		}

@@ -11,12 +11,12 @@ import (
 
 func TestReactAgent_chat(t *testing.T) {
 	t.Run("test minimax api", func(t *testing.T) {
-		apiKey := os.Getenv("API_KEY")
+		apiKey := os.Getenv("MINIMAX_API_KEY")
 		if apiKey == "" {
 			return
 		}
 		config := openai.DefaultConfig(apiKey)
-		config.BaseURL = "https://api.openai.com/v1"
+		config.BaseURL = "https://api.minimaxi.com/v1"
 		client := openai.NewClientWithConfig(config)
 
 		// 3. Create the request
@@ -24,7 +24,7 @@ func TestReactAgent_chat(t *testing.T) {
 		resp, err := client.CreateChatCompletion(
 			context.Background(),
 			openai.ChatCompletionRequest{
-				Model: "gpt-5.2",
+				Model: "MiniMax-M2.5",
 				Messages: []openai.ChatCompletionMessage{
 					{
 						Role:    openai.ChatMessageRoleUser,

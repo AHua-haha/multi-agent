@@ -52,7 +52,7 @@ func (w *Workflow) Init() error {
 	return nil
 }
 
-func (w *Workflow) OrchestratorAgent() error {
+func (w *Workflow) OrchestratorAgent() (string, error) {
 	instruct := `
 You are the **Task Orchestrator** agent. You decompose 'User Primary Goal' into the smallest possible units of task.
 Analyze the 'Task History' against the 'User Primary Goal'. You must choose one of two paths:
@@ -79,11 +79,21 @@ IMPORTANT: The 'Eexpected Ooutput Requirements' must be highly focused. Do not a
 	tools.RegisterToolEndpoint(w.taskMgr.CreateTaskTool())
 	userInput := w.taskMgr.GetTaskContextPrompt()
 	agent := NewBaseAgent(instruct, userInput, tools)
-	err := agent.Run(w.client, "MiniMax-M2.5")
-	if err != nil {
-		return err
+
+	var final_msg string = ""
+
+	outputFunc := func(msg openai.ChatCompletionMessage) bool {
+		if len(msg.ToolCalls) == 0 {
+			final_msg = msg.Content
+		}
+		return true
 	}
-	return nil
+
+	err := agent.Run(w.client, "MiniMax-M2.5", outputFunc)
+	if err != nil {
+		return "", err
+	}
+	return final_msg, err
 }
 
 func (w *Workflow) WorkerAgent() error {
@@ -103,7 +113,19 @@ IMPORTANT: do not continue the 'User Primary Goal' after you call 'finish_task' 
 	tools.RegisterToolEndpoint(mcpTool...)
 	userInput := w.taskMgr.GetTaskContextPrompt()
 	agent := NewBaseAgent(instruct, userInput, tools)
-	err = agent.Run(w.client, "MiniMax-M2.5")
+
+	outputFunc := func(msg openai.ChatCompletionMessage) bool {
+		if len(msg.ToolCalls) != 0 {
+			for _, call := range msg.ToolCalls {
+				if call.Function.Name == "finish_task" {
+					return true
+				}
+			}
+		}
+		return false
+	}
+
+	err = agent.Run(w.client, "MiniMax-M2.5", outputFunc)
 	if err != nil {
 		return err
 	}
@@ -121,9 +143,13 @@ func (w *Workflow) SingleAgent() error {
 
 		log.Info().Msg("agent start running")
 		for {
-			err := w.OrchestratorAgent()
+			res, err := w.OrchestratorAgent()
 			if err != nil {
 				log.Error().Err(err).Msg("run orchestrator agent failed")
+				break
+			}
+			if res != "" {
+				fmt.Printf("Final Response:\n%s\n", res)
 				break
 			}
 			err = w.WorkerAgent()

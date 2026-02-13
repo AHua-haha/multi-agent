@@ -11,6 +11,8 @@ import (
 	"github.com/sashabaranov/go-openai"
 )
 
+type OutputFunc func(msg openai.ChatCompletionMessage) bool
+
 type BaseAgent struct {
 	actionStack  []openai.ChatCompletionMessage
 	input        []openai.ChatCompletionMessage
@@ -54,7 +56,7 @@ func (a *BaseAgent) handleToolCall(toolCalls []openai.ToolCall) {
 		writer.WriteString("</TOOL CALL>\n")
 	}
 }
-func (a *BaseAgent) Run(client *openai.Client, model string) error {
+func (a *BaseAgent) Run(client *openai.Client, model string, outputFunc OutputFunc) error {
 	f, err := os.OpenFile("agent_log.txt", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		panic(err)
@@ -78,11 +80,17 @@ func (a *BaseAgent) Run(client *openai.Client, model string) error {
 		writer.WriteString(fmt.Sprintf("content:\n%s\n", resp.Message.Content))
 		writer.WriteString("</MSG>\n")
 
+		a.handleToolCall(resp.Message.ToolCalls)
+
+		finished := outputFunc(resp.Message)
+		if finished {
+			break
+		}
 		if resp.FinishReason == openai.FinishReasonStop {
 			break
 		}
-		a.handleToolCall(resp.Message.ToolCalls)
 	}
+	writer.Flush()
 	return nil
 }
 

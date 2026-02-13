@@ -125,12 +125,8 @@ IMPORTANT: The 'Eexpected Ooutput Requirements' must be highly focused. Do not a
 `
 
 func (mgr *TaskMgr) GetTaskContextPrompt() string {
-	intro := `
-Below is the 'Task History' with the result of each task. The result of each task includes conclusion and context information.
-`
 	var builder strings.Builder
 	builder.WriteString(fmt.Sprintf("** USER PRIMARY GOAL **: %s\n", mgr.UserGoal))
-	builder.WriteString(intro)
 	builder.WriteString("### TASK HISTORY\n")
 	if len(mgr.PreTasks) != 0 {
 		builder.WriteString("** Completed Tasks **\n")
@@ -143,6 +139,7 @@ Below is the 'Task History' with the result of each task. The result of each tas
 	if mgr.CurrentTask == nil {
 		builder.WriteString("NO TASK IN PROGRESS\n")
 	} else {
+		builder.WriteString("Focus MAINLY on this 'Current Task', accomplish the 'Current Task', make best effort to meet the 'Conclusion Requirements' and 'Backgournd Context Requirements'\n")
 		builder.WriteString("** Current Tasks **\n")
 		builder.WriteString(mgr.CurrentTask.formatString())
 	}

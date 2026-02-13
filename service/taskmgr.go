@@ -95,6 +95,7 @@ func (mgr *TaskMgr) finishTask(answer string, contexts []ContextItem) error {
 var DoingTaskInstruct = `
 ### INSTRUCTION
 You are now working on a sub task. Focus on the currect sub task, use the available tools to accomplist the current sub task, after you accomplish the currect task, you MUST explicitly finish the task with the output IMMEDIATELY.
+Focus on the 'Conclusion Requirements' and the 'Background Context Requirements', make best effort to meet these requirements.
 
 IMPORTANT: after you accomplish the current sub task, MUST IMMEDIATELY use the 'finish_task' tool to record the output of this current task.
 IMPORTANT: do not continue the User Primary Goal unless you call 'finish_task' tool to finish the current task.
@@ -125,7 +126,7 @@ IMPORTANT: The 'Eexpected Ooutput Requirements' must be highly focused. Do not a
 
 func (mgr *TaskMgr) GetTaskContextPrompt() string {
 	intro := `
-Below is the task history with the result of each task. The result of each task includes conclusion and context information.
+Below is the 'Task History' with the result of each task. The result of each task includes conclusion and context information.
 `
 	var builder strings.Builder
 	builder.WriteString(fmt.Sprintf("** USER PRIMARY GOAL **: %s\n", mgr.UserGoal))
@@ -146,11 +147,6 @@ Below is the task history with the result of each task. The result of each task 
 		builder.WriteString(mgr.CurrentTask.formatString())
 	}
 	builder.WriteByte('\n')
-	// if mgr.CurrentTask == nil {
-	// 	builder.WriteString(CreateTaskInstruct)
-	// } else {
-	// 	builder.WriteString(DoingTaskInstruct)
-	// }
 	return builder.String()
 }
 

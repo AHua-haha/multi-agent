@@ -14,7 +14,7 @@ func main() {
 		log.Error().Err(err).Msg("workflow init failed")
 		return
 	}
-	err = workflow.SingleAgent()
+	err = workflow.Run()
 	if err != nil {
 		log.Error().Err(err).Msg("run single agent failed")
 		return

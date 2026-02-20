@@ -17,7 +17,7 @@ type TaskItem struct {
 	ContextReq    string
 
 	Conclusion string
-	Context    []ContextItem
+	Context    map[int]*ContextItem
 }
 
 type ContextItem struct {
@@ -64,6 +64,16 @@ func (mgr *TaskMgr) FillToolLog(toolLog []*ToolExecLog) {
 	}
 }
 
+func (mgr *TaskMgr) refineContext(oldID int, newID int) error {
+	task := mgr.PreTasks[len(mgr.PreTasks)-1]
+	item, exist := task.Context[oldID]
+	if !exist {
+		return fmt.Errorf("contex ID %d not found", oldID)
+	}
+	item.ID = newID
+	return nil
+}
+
 func (mgr *TaskMgr) createTask(goal string, answerSpec string, contextSpec string) error {
 	if mgr.CurrentTask != nil {
 		return fmt.Errorf("Current Task %s not finished, can not create new task", mgr.CurrentTask.Goal)
@@ -74,6 +84,7 @@ func (mgr *TaskMgr) createTask(goal string, answerSpec string, contextSpec strin
 		Goal:          goal,
 		ConclusionReq: answerSpec,
 		ContextReq:    contextSpec,
+		Context:       map[int]*ContextItem{},
 	}
 	return nil
 }
@@ -85,44 +96,47 @@ func (mgr *TaskMgr) finishTask(answer string, contexts []ContextItem) error {
 
 	mgr.CurrentTask.Completed = true
 	mgr.CurrentTask.Conclusion = answer
-	mgr.CurrentTask.Context = contexts
+	for i, ctx := range contexts {
+		mgr.CurrentTask.Context[i] = &ctx
+	}
 	mgr.PreTasks = append(mgr.PreTasks, mgr.CurrentTask)
 
 	mgr.CurrentTask = nil
 	return nil
 }
+func (mgr *TaskMgr) GetInputForRefineContext() string {
+	var builder strings.Builder
+	builder.WriteString(fmt.Sprintf("** USER PRIMARY GOAL **: %s\n", mgr.UserGoal))
+	builder.WriteString("### TASK HISTORY\n")
+	length := len(mgr.PreTasks)
+	if len(mgr.PreTasks) != 0 {
+		builder.WriteString("** Completed Tasks **\n")
+		for _, task := range mgr.PreTasks[:length-1] {
+			builder.WriteString(task.formatString())
+		}
+		builder.WriteByte('\n')
+	}
 
-var DoingTaskInstruct = `
-### INSTRUCTION
-You are now working on a sub task. Focus on the currect sub task, use the available tools to accomplist the current sub task, after you accomplish the currect task, you MUST explicitly finish the task with the output IMMEDIATELY.
-Focus on the 'Conclusion Requirements' and the 'Background Context Requirements', make best effort to meet these requirements.
+	lastTask := mgr.PreTasks[length-1]
+	builder.WriteString(fmt.Sprintf("Task %d: %s\n", lastTask.ID, lastTask.Goal))
+	builder.WriteString(fmt.Sprintf("Conclusions Requirements:\n%s\nBackground Context Requirements:\n%s\n", lastTask.ConclusionReq, lastTask.ContextReq))
+	if lastTask.Conclusion != "" {
+		builder.WriteString(fmt.Sprintf("Conclusions:\n%s\n", lastTask.Conclusion))
+	}
 
-IMPORTANT: after you accomplish the current sub task, MUST IMMEDIATELY use the 'finish_task' tool to record the output of this current task.
-IMPORTANT: do not continue the User Primary Goal unless you call 'finish_task' tool to finish the current task.
-`
+	builder.WriteString("Refine the following tool call Context\n")
 
-var CreateTaskInstruct = `
-Analyze the 'Task History' against the 'User Primary Goal'. You must choose one of two paths:
+	for _, ctx := range lastTask.Context {
+		builder.WriteString(fmt.Sprintf("Context ID: %d, Description: %s\n", ctx.ID, ctx.Desc))
+		builder.WriteString("<Tool Call>\n")
+		builder.WriteString(fmt.Sprintf("Tool Call Name: %s, Tool Call Args: %s\n", ctx.ToolLog.ToolCallName, ctx.ToolLog.ToolCallArgs))
+		builder.WriteString(fmt.Sprintf("** Result **\n%s", ctx.ToolLog.ToolCallRes))
+		builder.WriteString("</Tool Call>\n")
+	}
 
-#### PATH A: GOAL NOT COMPLETED (DECOMPOSE & CREATE TASK)
-If information is missing or a multi-step process is still underway:
-1. **Decompose**: Identify the immediate next logical task.
-2. **Create Atomic Task**: Define a single, focused task, the task should have only one goal, the task MUST be atomic, NEVER create too complex task with multiple goals.
-3. **Structured Expected Output Requirements**: Define the expected "Primary Conclusions" and "Background Context" for the task.
-   - NEVER define too complex 'Expected Output', the 'Expected Output' should be simple and focused, 2-3 most essential items is the best.
-   - ** Conclusions Requirements **: These are the direct facts and conclusions to extract as the output of the task.
-   - ** Background Context Requirements **: background context to observe and record,
-
-#### PATH B: GOAL COMPLETED (FINALIZE)
-If all the 'Task History' provide a full answer:
-1. **Synthesize**: Combine all facts into a coherent response.
-2. **Nuance**: Add relevant "Background Context" to provide helpful background or warnings.
-3. **Finalize**: Deliver the final response to the user directly without using the 'finish_task' tool.
-
-IMPORTANT: never assign a task that is too complex and have multiple goals, decompose complex goals into the smallest possible units of task.
-IMPORTANT: The 'Eexpected Ooutput Requirements' must be highly focused. Do not ask for "everything." Ask for the 1-2 most critical facts.
-
-`
+	builder.WriteByte('\n')
+	return builder.String()
+}
 
 func (mgr *TaskMgr) GetTaskContextPrompt() string {
 	var builder strings.Builder
@@ -155,6 +169,10 @@ type CreateTaskArgs struct {
 type FinishTaskArgs struct {
 	Conclusion string
 	Context    []ContextItem
+}
+type RefineContextArgs struct {
+	OldID int
+	NewID int
 }
 
 func (mgr *TaskMgr) CreateTaskTool() ToolEndPoint {
@@ -246,6 +264,44 @@ func (mgr *TaskMgr) FinishTaskTool() ToolEndPoint {
 	}
 	endpoint := ToolEndPoint{
 		Name:    "finish_task",
+		Def:     def,
+		Handler: Handler,
+	}
+	return endpoint
+}
+func (mgr *TaskMgr) RefineContextTool() ToolEndPoint {
+	def := openai.FunctionDefinition{
+		Name:        "refine_context",
+		Description: "replace the context with the refined context",
+		Parameters: jsonschema.Definition{
+			Type: jsonschema.Object,
+			Properties: map[string]jsonschema.Definition{
+				"OldID": {
+					Type:        jsonschema.Integer,
+					Description: "the old id of the context",
+				},
+				"NewID": {
+					Type:        jsonschema.Integer,
+					Description: "the new id of the context",
+				},
+			},
+			Required: []string{"OldD", "NewID"},
+		},
+	}
+	Handler := func(args string) (string, error) {
+		var para RefineContextArgs
+		err := json.Unmarshal([]byte(args), &para)
+		if err != nil {
+			return "", err
+		}
+		err = mgr.refineContext(para.OldID, para.NewID)
+		if err != nil {
+			return "", err
+		}
+		return "", nil
+	}
+	endpoint := ToolEndPoint{
+		Name:    "refine_context",
 		Def:     def,
 		Handler: Handler,
 	}

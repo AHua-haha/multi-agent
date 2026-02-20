@@ -43,13 +43,14 @@ type ToolDispatcher struct {
 	toolLog []*ToolExecLog
 }
 
-func NewToolDispatcher() *ToolDispatcher {
+func NewToolDispatcher(toolLog []*ToolExecLog) *ToolDispatcher {
 	return &ToolDispatcher{
 		toolMap: map[string]ToolEndPoint{},
+		toolLog: toolLog,
 	}
 }
-func (td *ToolDispatcher) ResetLog() {
-	td.toolLog = nil
+func (td *ToolDispatcher) GetToolLog() []*ToolExecLog {
+	return td.toolLog
 }
 
 func (td *ToolDispatcher) RegisterToolEndpoint(endpoints ...ToolEndPoint) error {

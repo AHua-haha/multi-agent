@@ -67,14 +67,14 @@ func ViewFile(file string, lines [][]int) (string, error) {
 		return validLines[i][0] < validLines[j][0]
 	})
 	var builder strings.Builder
+	if len(validLines) == 0 {
+		builder.WriteString("invalid line ranges, please try agein with the right line ranges\n")
+	}
 	linecnt, err := shared.CountLines(file)
 	if err != nil {
 		return "", err
 	}
 	builder.WriteString(fmt.Sprintf("File %s total lines: %d\n", file, linecnt))
-	if len(validLines) == 0 {
-		builder.WriteString("invalid line ranges\n")
-	}
 	mergeLines := [][]int{}
 	for idx := 0; idx < len(validLines); {
 		start := validLines[idx][0]

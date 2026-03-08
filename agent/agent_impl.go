@@ -30,7 +30,7 @@ IMPORTANT: never assign a task that is too complex and have multiple goals, deco
 IMPORTANT: The 'Eexpected Ooutput Requirements' must be highly focused. Do not ask for "everything." Ask for the 1-2 most critical facts.
 `
 	tools := service.NewToolDispatcher(w.toolLog)
-	tools.RegisterToolEndpoint(w.taskMgr.CreateTaskTool())
+	tools.RegisterToolEndpoint(w.taskMgr.CreateExploreTaskTool(), w.taskMgr.CreateReasonTaskTool(), w.taskMgr.CreateBuildTaskTool(), w.taskMgr.CreateVerifyTaskTool())
 	userInput := w.taskMgr.GetTaskContextPrompt()
 	agent := NewBaseAgent(instruct, userInput, tools)
 
@@ -65,7 +65,7 @@ IMPORTANT: your goal is not to complete the 'User Primary Goal', instead, Focus 
 	if err != nil {
 		return err
 	}
-	tools.RegisterToolEndpoint(w.taskMgr.FinishTaskTool())
+	tools.RegisterToolEndpoint(w.taskMgr.FinishExploreTaskTool(), w.taskMgr.FinishReasonTaskTool(), w.taskMgr.FinishBuildTaskTool(), w.taskMgr.FinishVerifyTaskTool())
 	tools.RegisterToolEndpoint(mcpTool...)
 	userInput := w.taskMgr.GetTaskContextPrompt()
 	agent := NewBaseAgent(instruct, userInput, tools)
@@ -86,7 +86,6 @@ IMPORTANT: your goal is not to complete the 'User Primary Goal', instead, Focus 
 		return err
 	}
 	w.toolLog = tools.GetToolLog()
-	w.taskMgr.FillToolLog(w.toolLog)
 	return nil
 }
 func (w *Workflow) ContextAgent() error {

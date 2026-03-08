@@ -70,12 +70,12 @@ func (mgr *TaskMgr) Reset(userGoal string) {
 // }
 
 func (mgr *TaskMgr) refineContext(oldID int, newID int) error {
-	task := mgr.PreTasks[len(mgr.PreTasks)-1]
-	item, exist := task.Context[oldID]
-	if !exist {
-		return fmt.Errorf("contex ID %d not found", oldID)
-	}
-	item.ID = newID
+	// task := mgr.PreTasks[len(mgr.PreTasks)-1]
+	// item, exist := task.Context[oldID]
+	// if !exist {
+	// 	return fmt.Errorf("contex ID %d not found", oldID)
+	// }
+	// item.ID = newID
 	return nil
 }
 
@@ -153,7 +153,108 @@ type RefineContextArgs struct {
 	OldID int
 	NewID int
 }
+type CreateExploreTaskArgs struct {
+	Task         string
+	ExpectOutput string
+}
 
+func (mgr *TaskMgr) CreateExploreTaskTool() ToolEndPoint {
+	endpoint := CreateExploreTask()
+	endpoint.Handler = func(args string) (string, error) {
+		var para CreateExploreTaskArgs
+		err := json.Unmarshal([]byte(args), &para)
+		if err != nil {
+			return "", err
+		}
+		task := &ExploreTask{
+			Task:         para.Task,
+			ExpectOutput: para.ExpectOutput,
+			Context:      []ContextItem{},
+		}
+		err = mgr.createTask(task)
+		if err != nil {
+			return "", err
+		}
+		return "", nil
+	}
+	return endpoint
+}
+type CreateReasonTaskArgs struct {
+	Task         string
+	ExpectOutput string
+}
+
+func (mgr *TaskMgr) CreateReasonTaskTool() ToolEndPoint {
+	endpoint := CreateReasonTask()
+	endpoint.Handler = func(args string) (string, error) {
+		var para CreateReasonTaskArgs
+		err := json.Unmarshal([]byte(args), &para)
+		if err != nil {
+			return "", err
+		}
+		task := &ReasonTask{
+			Task:         para.Task,
+			ExpectOutput: para.ExpectOutput,
+			Conclusion:   "",
+		}
+		err = mgr.createTask(task)
+		if err != nil {
+			return "", err
+		}
+		return "", nil
+	}
+	return endpoint
+}
+type CreateBuildTaskArgs struct {
+	Task string
+}
+
+func (mgr *TaskMgr) CreateBuildTaskTool() ToolEndPoint {
+	endpoint := CreateBuildTask()
+	endpoint.Handler = func(args string) (string, error) {
+		var para CreateBuildTaskArgs
+		err := json.Unmarshal([]byte(args), &para)
+		if err != nil {
+			return "", err
+		}
+		task := &BuildTask{
+			Task:      para.Task,
+			ChangeLog: "",
+			Context:   []ContextItem{},
+		}
+		err = mgr.createTask(task)
+		if err != nil {
+			return "", err
+		}
+		return "", nil
+	}
+	return endpoint
+}
+type CreateVerifyTaskArgs struct {
+	Task string
+}
+
+func (mgr *TaskMgr) CreateVerifyTaskTool() ToolEndPoint {
+	endpoint := CreateVerifyTask()
+	endpoint.Handler = func(args string) (string, error) {
+		var para CreateVerifyTaskArgs
+		err := json.Unmarshal([]byte(args), &para)
+		if err != nil {
+			return "", err
+		}
+		task := &VerifyTask{
+			Task:       para.Task,
+			Conclusion: "",
+			Context:    []ContextItem{},
+		}
+		err = mgr.createTask(task)
+		if err != nil {
+			return "", err
+		}
+		return "", nil
+	}
+	return endpoint
+}
 func (mgr *TaskMgr) CreateTaskTool() ToolEndPoint {
 	def := openai.FunctionDefinition{
 		Name:        "create_task",
@@ -283,6 +384,92 @@ func (mgr *TaskMgr) RefineContextTool() ToolEndPoint {
 		Name:    "refine_context",
 		Def:     def,
 		Handler: Handler,
+	}
+	return endpoint
+}
+
+func (mgr *TaskMgr) FinishExploreTaskTool() ToolEndPoint {
+	endpoint := FinishExploreTask()
+	endpoint.Handler = func(args string) (string, error) {
+		var para FinishExploreTaskArgs
+		err := json.Unmarshal([]byte(args), &para)
+		if err != nil {
+			return "", err
+		}
+		// Cast to ExploreTask to update Context
+		if exploreTask, ok := mgr.CurrentTask.(*ExploreTask); ok {
+			exploreTask.Context = para.Context
+		}
+		err = mgr.finishTask()
+		if err != nil {
+			return "", err
+		}
+		return "", nil
+	}
+	return endpoint
+}
+
+func (mgr *TaskMgr) FinishReasonTaskTool() ToolEndPoint {
+	endpoint := FinishReasonTask()
+	endpoint.Handler = func(args string) (string, error) {
+		var para FinishReasonTaskArgs
+		err := json.Unmarshal([]byte(args), &para)
+		if err != nil {
+			return "", err
+		}
+		// Cast to ReasonTask to update Conclusion
+		if reasonTask, ok := mgr.CurrentTask.(*ReasonTask); ok {
+			reasonTask.Conclusion = para.Conclusion
+		}
+		err = mgr.finishTask()
+		if err != nil {
+			return "", err
+		}
+		return "", nil
+	}
+	return endpoint
+}
+
+func (mgr *TaskMgr) FinishBuildTaskTool() ToolEndPoint {
+	endpoint := FinishBuildTask()
+	endpoint.Handler = func(args string) (string, error) {
+		var para FinishBuildTaskArgs
+		err := json.Unmarshal([]byte(args), &para)
+		if err != nil {
+			return "", err
+		}
+		// Cast to BuildTask to update ChangeLog and Context
+		if buildTask, ok := mgr.CurrentTask.(*BuildTask); ok {
+			buildTask.ChangeLog = para.ChangeLog
+			buildTask.Context = para.Context
+		}
+		err = mgr.finishTask()
+		if err != nil {
+			return "", err
+		}
+		return "", nil
+	}
+	return endpoint
+}
+
+func (mgr *TaskMgr) FinishVerifyTaskTool() ToolEndPoint {
+	endpoint := FinishVerifyTask()
+	endpoint.Handler = func(args string) (string, error) {
+		var para FinishVerifyTaskArgs
+		err := json.Unmarshal([]byte(args), &para)
+		if err != nil {
+			return "", err
+		}
+		// Cast to VerifyTask to update Conclusion and Context
+		if verifyTask, ok := mgr.CurrentTask.(*VerifyTask); ok {
+			verifyTask.Conclusion = para.Conclusion
+			verifyTask.Context = para.Context
+		}
+		err = mgr.finishTask()
+		if err != nil {
+			return "", err
+		}
+		return "", nil
 	}
 	return endpoint
 }

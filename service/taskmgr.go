@@ -20,13 +20,17 @@ type TaskItem struct {
 	Context    map[int]*ContextItem
 }
 
+func (item *TaskItem) GetTask() string {
+	return item.Goal
+}
+
 type ContextItem struct {
 	ID      int
 	Desc    string
 	ToolLog *ToolExecLog
 }
 
-func (item *TaskItem) formatString() string {
+func (item *TaskItem) FormatString() string {
 	var builder strings.Builder
 	builder.WriteString(fmt.Sprintf("Task %d: %s\n", item.ID, item.Goal))
 	if !item.Completed {
@@ -48,8 +52,8 @@ func (item *TaskItem) formatString() string {
 
 type TaskMgr struct {
 	UserGoal    string
-	PreTasks    []*TaskItem
-	CurrentTask *TaskItem
+	PreTasks    []Task
+	CurrentTask Task
 }
 
 func (mgr *TaskMgr) Reset(userGoal string) {
@@ -57,12 +61,13 @@ func (mgr *TaskMgr) Reset(userGoal string) {
 	mgr.PreTasks = nil
 	mgr.CurrentTask = nil
 }
-func (mgr *TaskMgr) FillToolLog(toolLog []*ToolExecLog) {
-	task := mgr.PreTasks[len(mgr.PreTasks)-1]
-	for i := range task.Context {
-		task.Context[i].ToolLog = toolLog[task.Context[i].ID]
-	}
-}
+
+// func (mgr *TaskMgr) FillToolLog(toolLog []*ToolExecLog) {
+// 	task := mgr.PreTasks[len(mgr.PreTasks)-1]
+// 	for i := range task.Context {
+// 		task.Context[i].ToolLog = toolLog[task.Context[i].ID]
+// 	}
+// }
 
 func (mgr *TaskMgr) refineContext(oldID int, newID int) error {
 	task := mgr.PreTasks[len(mgr.PreTasks)-1]
@@ -74,33 +79,20 @@ func (mgr *TaskMgr) refineContext(oldID int, newID int) error {
 	return nil
 }
 
-func (mgr *TaskMgr) createTask(goal string, answerSpec string, contextSpec string) error {
+func (mgr *TaskMgr) createTask(task Task) error {
 	if mgr.CurrentTask != nil {
-		return fmt.Errorf("Current Task %s not finished, can not create new task", mgr.CurrentTask.Goal)
+		return fmt.Errorf("Current Task %s not finished, can not create new task", task.GetTask())
 	}
-	mgr.CurrentTask = &TaskItem{
-		ID:            len(mgr.PreTasks) + 1,
-		Completed:     false,
-		Goal:          goal,
-		ConclusionReq: answerSpec,
-		ContextReq:    contextSpec,
-		Context:       map[int]*ContextItem{},
-	}
+	mgr.CurrentTask = task
 	return nil
 }
 
-func (mgr *TaskMgr) finishTask(answer string, contexts []ContextItem) error {
+func (mgr *TaskMgr) finishTask() error {
 	if mgr.CurrentTask == nil {
 		return fmt.Errorf("There is no current task, can not finish task")
 	}
 
-	mgr.CurrentTask.Completed = true
-	mgr.CurrentTask.Conclusion = answer
-	for i, ctx := range contexts {
-		mgr.CurrentTask.Context[i] = &ctx
-	}
 	mgr.PreTasks = append(mgr.PreTasks, mgr.CurrentTask)
-
 	mgr.CurrentTask = nil
 	return nil
 }
@@ -112,27 +104,14 @@ func (mgr *TaskMgr) GetInputForRefineContext() string {
 	if len(mgr.PreTasks) != 0 {
 		builder.WriteString("** Completed Tasks **\n")
 		for _, task := range mgr.PreTasks[:length-1] {
-			builder.WriteString(task.formatString())
+			builder.WriteString(task.FormatString())
 		}
 		builder.WriteByte('\n')
 	}
 
 	lastTask := mgr.PreTasks[length-1]
-	builder.WriteString(fmt.Sprintf("Task %d: %s\n", lastTask.ID, lastTask.Goal))
-	builder.WriteString(fmt.Sprintf("Conclusions Requirements:\n%s\nBackground Context Requirements:\n%s\n", lastTask.ConclusionReq, lastTask.ContextReq))
-	if lastTask.Conclusion != "" {
-		builder.WriteString(fmt.Sprintf("Conclusions:\n%s\n", lastTask.Conclusion))
-	}
-
-	builder.WriteString("Refine the following tool call Context\n")
-
-	for _, ctx := range lastTask.Context {
-		builder.WriteString(fmt.Sprintf("Context ID: %d, Description: %s\n", ctx.ID, ctx.Desc))
-		builder.WriteString("<Tool Call>\n")
-		builder.WriteString(fmt.Sprintf("Tool Call Name: %s, Tool Call Args: %s\n", ctx.ToolLog.ToolCallName, ctx.ToolLog.ToolCallArgs))
-		builder.WriteString(fmt.Sprintf("** Result **\n%s", ctx.ToolLog.ToolCallRes))
-		builder.WriteString("</Tool Call>\n")
-	}
+	builder.WriteString(lastTask.FormatString())
+	builder.WriteString("Refine the context from the last task above\n")
 
 	builder.WriteByte('\n')
 	return builder.String()
@@ -145,7 +124,7 @@ func (mgr *TaskMgr) GetTaskContextPrompt() string {
 	if len(mgr.PreTasks) != 0 {
 		builder.WriteString("** Completed Tasks **\n")
 		for _, task := range mgr.PreTasks {
-			builder.WriteString(task.formatString())
+			builder.WriteString(task.FormatString())
 		}
 		builder.WriteByte('\n')
 	}
@@ -153,9 +132,9 @@ func (mgr *TaskMgr) GetTaskContextPrompt() string {
 	if mgr.CurrentTask == nil {
 		builder.WriteString("NO TASK IN PROGRESS\n")
 	} else {
-		builder.WriteString("Focus MAINLY on this 'Current Task', accomplish the 'Current Task', make best effort to meet the 'Conclusion Requirements' and 'Backgournd Context Requirements'\n")
+		builder.WriteString("Focus MAINLY on this 'Current Task', accomplish the 'Current Task'\n")
 		builder.WriteString("** Current Tasks **\n")
-		builder.WriteString(mgr.CurrentTask.formatString())
+		builder.WriteString(mgr.CurrentTask.FormatString())
 	}
 	builder.WriteByte('\n')
 	return builder.String()

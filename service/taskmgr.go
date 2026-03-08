@@ -2,6 +2,7 @@ package service
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -51,9 +52,10 @@ func (item *TaskItem) FormatString() string {
 }
 
 type TaskMgr struct {
-	UserGoal    string
-	PreTasks    []Task
-	CurrentTask Task
+	UserGoal       string
+	PreTasks       []Task
+	CurrentTask    Task
+	toolDispatcher *ToolDispatcher
 }
 
 func (mgr *TaskMgr) Reset(userGoal string) {
@@ -62,12 +64,20 @@ func (mgr *TaskMgr) Reset(userGoal string) {
 	mgr.CurrentTask = nil
 }
 
-// func (mgr *TaskMgr) FillToolLog(toolLog []*ToolExecLog) {
-// 	task := mgr.PreTasks[len(mgr.PreTasks)-1]
-// 	for i := range task.Context {
-// 		task.Context[i].ToolLog = toolLog[task.Context[i].ID]
-// 	}
-// }
+func (mgr *TaskMgr) FillToolLog(context []ContextItem) error {
+	var err []error
+	for i, elem := range context {
+		if elem.ID < 0 || elem.ID >= len(mgr.toolDispatcher.toolLog) {
+			err = append(err, fmt.Errorf("invalid tool log ID %d, must be between 0 and %d", elem.ID, len(mgr.toolDispatcher.toolLog)-1))
+		} else {
+			context[i].ToolLog = mgr.toolDispatcher.toolLog[elem.ID]
+		}
+	}
+	if len(err) != 0 {
+		return errors.Join(err...)
+	}
+	return nil
+}
 
 func (mgr *TaskMgr) refineContext(oldID int, newID int) error {
 	// task := mgr.PreTasks[len(mgr.PreTasks)-1]
@@ -179,6 +189,7 @@ func (mgr *TaskMgr) CreateExploreTaskTool() ToolEndPoint {
 	}
 	return endpoint
 }
+
 type CreateReasonTaskArgs struct {
 	Task         string
 	ExpectOutput string
@@ -205,6 +216,7 @@ func (mgr *TaskMgr) CreateReasonTaskTool() ToolEndPoint {
 	}
 	return endpoint
 }
+
 type CreateBuildTaskArgs struct {
 	Task string
 }
@@ -230,6 +242,7 @@ func (mgr *TaskMgr) CreateBuildTaskTool() ToolEndPoint {
 	}
 	return endpoint
 }
+
 type CreateVerifyTaskArgs struct {
 	Task string
 }
@@ -255,100 +268,7 @@ func (mgr *TaskMgr) CreateVerifyTaskTool() ToolEndPoint {
 	}
 	return endpoint
 }
-func (mgr *TaskMgr) CreateTaskTool() ToolEndPoint {
-	def := openai.FunctionDefinition{
-		Name:        "create_task",
-		Description: "Defines a structured task by outlining the objective, the specific instruction about target conclusion to extract, and the background context to observe and record.",
-		Parameters: jsonschema.Definition{
-			Type: jsonschema.Object,
-			Properties: map[string]jsonschema.Definition{
-				"Goal": {
-					Type:        jsonschema.String,
-					Description: "The high-level objective of the task.",
-				},
-				"ConclusionReq": {
-					Type:        jsonschema.String,
-					Description: "Specific requirements on what direct facts to extract as the output of the task, can be empty if do not need",
-				},
-				"ContextReq": {
-					Type:        jsonschema.String,
-					Description: "Specific requirements on what background context to observe and record. can be empty if do not need",
-				},
-			},
-			Required: []string{"Goal", "ConclusionReq", "ContextReq"},
-		},
-	}
-	Handler := func(args string) (string, error) {
-		var para CreateTaskArgs
-		err := json.Unmarshal([]byte(args), &para)
-		if err != nil {
-			return "", err
-		}
-		err = mgr.createTask(para.Goal, para.ConclusionReq, para.ContextReq)
-		if err != nil {
-			return "", err
-		}
-		return "", nil
-	}
-	endpoint := ToolEndPoint{
-		Name:    "create_task",
-		Def:     def,
-		Handler: Handler,
-	}
-	return endpoint
-}
 
-func (mgr *TaskMgr) FinishTaskTool() ToolEndPoint {
-	def := openai.FunctionDefinition{
-		Name:        "finish_task",
-		Description: "Finish the current in progress task with the answer and context infomation",
-		Parameters: jsonschema.Definition{
-			Type: jsonschema.Object,
-			Properties: map[string]jsonschema.Definition{
-				"Conclusion": {
-					Type:        jsonschema.String,
-					Description: "The short and concise conclusions and facts required by the task conclusion requirements.",
-				},
-				"Context": {
-					Type:        jsonschema.Array,
-					Description: "A list of the tool execute result, which is the output of the task context requirements",
-					Items: &jsonschema.Definition{
-						Type: jsonschema.Object,
-						Properties: map[string]jsonschema.Definition{
-							"ID": {
-								Type:        jsonschema.Integer,
-								Description: "the id of the tool log",
-							},
-							"Desc": {
-								Type:        jsonschema.String,
-								Description: "the description of this background context",
-							},
-						},
-					},
-				},
-			},
-			Required: []string{"Conclusion", "Context"},
-		},
-	}
-	Handler := func(args string) (string, error) {
-		var para FinishTaskArgs
-		err := json.Unmarshal([]byte(args), &para)
-		if err != nil {
-			return "", err
-		}
-		err = mgr.finishTask(para.Conclusion, para.Context)
-		if err != nil {
-			return "", err
-		}
-		return "", nil
-	}
-	endpoint := ToolEndPoint{
-		Name:    "finish_task",
-		Def:     def,
-		Handler: Handler,
-	}
-	return endpoint
-}
 func (mgr *TaskMgr) RefineContextTool() ToolEndPoint {
 	def := openai.FunctionDefinition{
 		Name:        "refine_context",
@@ -398,6 +318,10 @@ func (mgr *TaskMgr) FinishExploreTaskTool() ToolEndPoint {
 		}
 		// Cast to ExploreTask to update Context
 		if exploreTask, ok := mgr.CurrentTask.(*ExploreTask); ok {
+			err := mgr.FillToolLog(para.Context)
+			if err != nil {
+				return "", err
+			}
 			exploreTask.Context = para.Context
 		}
 		err = mgr.finishTask()
@@ -440,6 +364,10 @@ func (mgr *TaskMgr) FinishBuildTaskTool() ToolEndPoint {
 		}
 		// Cast to BuildTask to update ChangeLog and Context
 		if buildTask, ok := mgr.CurrentTask.(*BuildTask); ok {
+			err := mgr.FillToolLog(para.Context)
+			if err != nil {
+				return "", err
+			}
 			buildTask.ChangeLog = para.ChangeLog
 			buildTask.Context = para.Context
 		}
@@ -462,6 +390,10 @@ func (mgr *TaskMgr) FinishVerifyTaskTool() ToolEndPoint {
 		}
 		// Cast to VerifyTask to update Conclusion and Context
 		if verifyTask, ok := mgr.CurrentTask.(*VerifyTask); ok {
+			err := mgr.FillToolLog(para.Context)
+			if err != nil {
+				return "", err
+			}
 			verifyTask.Conclusion = para.Conclusion
 			verifyTask.Context = para.Context
 		}

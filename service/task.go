@@ -1,29 +1,113 @@
 package service
 
 import (
+	"fmt"
+	"strings"
+
 	"github.com/sashabaranov/go-openai"
 	"github.com/sashabaranov/go-openai/jsonschema"
 )
+
+// Task is the interface that all task types must implement
+type Task interface {
+	FormatString() string
+	GetTask() string
+}
 
 type ExploreTask struct {
 	Task         string
 	ExpectOutput string
 	Context      []ContextItem
 }
+
+func (t *ExploreTask) GetTask() string {
+	return t.Task
+}
+
 type ReasonTask struct {
 	Task         string
 	ExpectOutput string
 	Conclusion   string
 }
+
+func (t *ReasonTask) GetTask() string {
+	return t.Task
+}
+
 type BuildTask struct {
 	Task      string
 	ChangeLog string
 	Context   []ContextItem
 }
+
+func (t *BuildTask) GetTask() string {
+	return t.Task
+}
+
 type VerifyTask struct {
 	Task       string
 	Conclusion string
 	Context    []ContextItem
+}
+
+func (t *VerifyTask) GetTask() string {
+	return t.Task
+}
+
+func (t *ExploreTask) FormatString() string {
+	var builder strings.Builder
+	builder.WriteString(fmt.Sprintf("Explore Task: %s\n", t.Task))
+	builder.WriteString(fmt.Sprintf("Expected Output:\n%s\n", t.ExpectOutput))
+	if len(t.Context) > 0 {
+		builder.WriteString("Context: ")
+		for _, ctx := range t.Context {
+			builder.WriteString(fmt.Sprintf("#%d: %s, ", ctx.ID, ctx.Desc))
+		}
+		builder.WriteByte('\n')
+	}
+	return builder.String()
+}
+
+func (t *ReasonTask) FormatString() string {
+	var builder strings.Builder
+	builder.WriteString(fmt.Sprintf("Reason Task: %s\n", t.Task))
+	builder.WriteString(fmt.Sprintf("Expected Output:\n%s\n", t.ExpectOutput))
+	if t.Conclusion != "" {
+		builder.WriteString(fmt.Sprintf("Conclusion:\n%s\n", t.Conclusion))
+	}
+	return builder.String()
+}
+
+func (t *BuildTask) FormatString() string {
+	var builder strings.Builder
+	builder.WriteString(fmt.Sprintf("Build Task: %s\n", t.Task))
+	if t.ChangeLog != "" {
+		builder.WriteString(fmt.Sprintf("Change Log:\n%s\n", t.ChangeLog))
+	}
+	if len(t.Context) > 0 {
+		builder.WriteString("Context: ")
+		for _, ctx := range t.Context {
+			builder.WriteString(fmt.Sprintf("#%d: %s, ", ctx.ID, ctx.Desc))
+		}
+		builder.WriteByte('\n')
+	}
+	return builder.String()
+}
+
+func (t *VerifyTask) FormatString() string {
+	var builder strings.Builder
+	builder.WriteString(fmt.Sprintf("Verify Task: %s\n", t.Task))
+	if t.Conclusion != "" {
+		builder.WriteString(fmt.Sprintf("Conclusion:\n%s\n", t.Conclusion))
+	}
+	if len(t.Context) > 0 {
+		builder.WriteString("Context: ")
+		for _, ctx := range t.Context {
+			builder.WriteString(fmt.Sprintf("#%d: %s, ", ctx.ID, ctx.Desc))
+		}
+		builder.WriteByte('\n')
+	}
+	return builder.String()
 }
 
 type FinishExploreTaskArgs struct {

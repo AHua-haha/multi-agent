@@ -23,6 +23,7 @@ type BuildTask struct {
 type VerifyTask struct {
 	Task       string
 	Conclusion string
+	Context    []ContextItem
 }
 
 type FinishExploreTaskArgs struct {
@@ -40,6 +41,7 @@ type FinishBuildTaskArgs struct {
 
 type FinishVerifyTaskArgs struct {
 	Conclusion string
+	Context    []ContextItem
 }
 
 func CreateExploreTask() ToolEndPoint {
@@ -237,16 +239,33 @@ func FinishBuildTask() ToolEndPoint {
 func FinishVerifyTask() ToolEndPoint {
 	def := openai.FunctionDefinition{
 		Name:        "finish_verify_task",
-		Description: "Finish the verification task with the conclusion of validation results",
+		Description: "Finish the verification task with the result (success/failed), reason if failed, and corresponding context as output",
 		Parameters: jsonschema.Definition{
 			Type: jsonschema.Object,
 			Properties: map[string]jsonschema.Definition{
 				"Conclusion": {
 					Type:        jsonschema.String,
-					Description: "The conclusion of the verification task, including validation results and findings",
+					Description: "The verification result: 'success' if verification passed, or 'failed' with detailed reason for the failure",
+				},
+				"Context": {
+					Type:        jsonschema.Array,
+					Description: "A list of tool execution results that provided context for the verification task",
+					Items: &jsonschema.Definition{
+						Type: jsonschema.Object,
+						Properties: map[string]jsonschema.Definition{
+							"ID": {
+								Type:        jsonschema.Integer,
+								Description: "the id of the tool log",
+							},
+							"Desc": {
+								Type:        jsonschema.String,
+								Description: "the description of this background context",
+							},
+						},
+					},
 				},
 			},
-			Required: []string{"Conclusion"},
+			Required: []string{"Conclusion", "Context"},
 		},
 	}
 	endpoint := ToolEndPoint{

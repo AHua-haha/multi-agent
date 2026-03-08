@@ -25,6 +25,23 @@ type VerifyTask struct {
 	Conclusion string
 }
 
+type FinishExploreTaskArgs struct {
+	Context []ContextItem
+}
+
+type FinishReasonTaskArgs struct {
+	Conclusion string
+}
+
+type FinishBuildTaskArgs struct {
+	ChangeLog string
+	Context   []ContextItem
+}
+
+type FinishVerifyTaskArgs struct {
+	Conclusion string
+}
+
 func CreateExploreTask() ToolEndPoint {
 	def := openai.FunctionDefinition{
 		Name:        "create_explore_task",
@@ -116,6 +133,124 @@ func CreateVerifyTask() ToolEndPoint {
 	}
 	endpoint := ToolEndPoint{
 		Name: "create_verify_task",
+		Def:  def,
+	}
+	return endpoint
+}
+
+func FinishExploreTask() ToolEndPoint {
+	def := openai.FunctionDefinition{
+		Name:        "finish_explore_task",
+		Description: "Finish the exploration task with the gathered output and context information",
+		Parameters: jsonschema.Definition{
+			Type: jsonschema.Object,
+			Properties: map[string]jsonschema.Definition{
+				"Context": {
+					Type:        jsonschema.Array,
+					Description: "A list of tool execution results that provided context for the exploration",
+					Items: &jsonschema.Definition{
+						Type: jsonschema.Object,
+						Properties: map[string]jsonschema.Definition{
+							"ID": {
+								Type:        jsonschema.Integer,
+								Description: "the id of the tool log",
+							},
+							"Desc": {
+								Type:        jsonschema.String,
+								Description: "the description of this background context",
+							},
+						},
+					},
+				},
+			},
+			Required: []string{"Context"},
+		},
+	}
+	endpoint := ToolEndPoint{
+		Name: "finish_explore_task",
+		Def:  def,
+	}
+	return endpoint
+}
+
+func FinishReasonTask() ToolEndPoint {
+	def := openai.FunctionDefinition{
+		Name:        "finish_reason_task",
+		Description: "Finish the reasoning task with the conclusion drawn from analysis",
+		Parameters: jsonschema.Definition{
+			Type: jsonschema.Object,
+			Properties: map[string]jsonschema.Definition{
+				"Conclusion": {
+					Type:        jsonschema.String,
+					Description: "The conclusion drawn from the reasoning task, based on gathered information",
+				},
+			},
+			Required: []string{"Conclusion"},
+		},
+	}
+	endpoint := ToolEndPoint{
+		Name: "finish_reason_task",
+		Def:  def,
+	}
+	return endpoint
+}
+
+func FinishBuildTask() ToolEndPoint {
+	def := openai.FunctionDefinition{
+		Name:        "finish_build_task",
+		Description: "Finish the build task with the change log and context of modifications made",
+		Parameters: jsonschema.Definition{
+			Type: jsonschema.Object,
+			Properties: map[string]jsonschema.Definition{
+				"ChangeLog": {
+					Type:        jsonschema.String,
+					Description: "Description of the actual changes made to the codebase",
+				},
+				"Context": {
+					Type:        jsonschema.Array,
+					Description: "A list of tool execution results that provided context of the build task",
+					Items: &jsonschema.Definition{
+						Type: jsonschema.Object,
+						Properties: map[string]jsonschema.Definition{
+							"ID": {
+								Type:        jsonschema.Integer,
+								Description: "the id of the tool log",
+							},
+							"Desc": {
+								Type:        jsonschema.String,
+								Description: "the description of this background context",
+							},
+						},
+					},
+				},
+			},
+			Required: []string{"ChangeLog", "Context"},
+		},
+	}
+	endpoint := ToolEndPoint{
+		Name: "finish_build_task",
+		Def:  def,
+	}
+	return endpoint
+}
+
+func FinishVerifyTask() ToolEndPoint {
+	def := openai.FunctionDefinition{
+		Name:        "finish_verify_task",
+		Description: "Finish the verification task with the conclusion of validation results",
+		Parameters: jsonschema.Definition{
+			Type: jsonschema.Object,
+			Properties: map[string]jsonschema.Definition{
+				"Conclusion": {
+					Type:        jsonschema.String,
+					Description: "The conclusion of the verification task, including validation results and findings",
+				},
+			},
+			Required: []string{"Conclusion"},
+		},
+	}
+	endpoint := ToolEndPoint{
+		Name: "finish_verify_task",
 		Def:  def,
 	}
 	return endpoint

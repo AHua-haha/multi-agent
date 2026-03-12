@@ -1,8 +1,6 @@
 package agent
 
 import (
-	"multi-agent/service"
-
 	"github.com/sashabaranov/go-openai"
 )
 
@@ -124,7 +122,9 @@ If Task History provides a complete answer:
 - **Keep ExpectOutput focused** - request only the 1-2 most critical facts, not "everything"
 - **Use Reason tasks** between Explore and Build to analyze findings and plan implementation
 `
-	tools := service.NewToolDispatcher(w.toolLog)
+
+	tools := w.toolDispatcher
+	tools.ResetTools()
 	tools.RegisterToolEndpoint(w.taskMgr.CreateExploreTaskTool(), w.taskMgr.CreateReasonTaskTool(), w.taskMgr.CreateBuildTaskTool(), w.taskMgr.CreateVerifyTaskTool())
 	userInput := w.taskMgr.GetTaskContextPrompt()
 	agent := NewBaseAgent(instruct, userInput, tools)
@@ -142,7 +142,6 @@ If Task History provides a complete answer:
 	if err != nil {
 		return "", err
 	}
-	w.toolLog = tools.GetToolLog()
 	return final_msg, err
 }
 
@@ -220,7 +219,8 @@ The task includes an "Expected Output" that tells you exactly what context to ga
 - If the Expected Output is impossible to achieve with available tools, note this in the context
 `
 
-	tools := service.NewToolDispatcher(w.toolLog)
+	tools := w.toolDispatcher
+	tools.ResetTools()
 	mcpTool, err := w.mcpclient.LoadAllTools()
 	if err != nil {
 		return err
@@ -245,7 +245,6 @@ The task includes an "Expected Output" that tells you exactly what context to ga
 	if err != nil {
 		return err
 	}
-	w.toolLog = tools.GetToolLog()
 	return nil
 }
 
@@ -298,7 +297,8 @@ You are the **Reason Worker Agent**. Your ONLY goal is to analyze information an
 - Never return analysis or working - only the final conclusion
 `
 
-	tools := service.NewToolDispatcher(w.toolLog)
+	tools := w.toolDispatcher
+	tools.ResetTools()
 	mcpTool, err := w.mcpclient.LoadAllTools()
 	if err != nil {
 		return err
@@ -323,7 +323,6 @@ You are the **Reason Worker Agent**. Your ONLY goal is to analyze information an
 	if err != nil {
 		return err
 	}
-	w.toolLog = tools.GetToolLog()
 	return nil
 }
 
@@ -384,7 +383,8 @@ You are the **Build Worker Agent**. Your ONLY goal is to implement changes to th
 - The Context array should contain all tool logs that performed modifications
 `
 
-	tools := service.NewToolDispatcher(w.toolLog)
+	tools := w.toolDispatcher
+	tools.ResetTools()
 	mcpTool, err := w.mcpclient.LoadAllTools()
 	if err != nil {
 		return err
@@ -409,7 +409,6 @@ You are the **Build Worker Agent**. Your ONLY goal is to implement changes to th
 	if err != nil {
 		return err
 	}
-	w.toolLog = tools.GetToolLog()
 	return nil
 }
 
@@ -499,7 +498,8 @@ Record evidence supporting your conclusion:
 - Never fake results - report findings honestly with detailed reasoning
 `
 
-	tools := service.NewToolDispatcher(w.toolLog)
+	tools := w.toolDispatcher
+	tools.ResetTools()
 	mcpTool, err := w.mcpclient.LoadAllTools()
 	if err != nil {
 		return err
@@ -524,7 +524,6 @@ Record evidence supporting your conclusion:
 	if err != nil {
 		return err
 	}
-	w.toolLog = tools.GetToolLog()
 	return nil
 }
 func (w *Workflow) ContextAgent() error {
@@ -537,7 +536,8 @@ You are given the previous 'Task History', each task has the 'Exprected Output',
 
 Your job is to refine the context output, make the context output short and concise, reduce unnecessary context.
 `
-	tools := service.NewToolDispatcher(w.toolLog)
+	tools := w.toolDispatcher
+	tools.ResetTools()
 	mcpTool, err := w.mcpclient.LoadAllTools()
 	if err != nil {
 		return err
@@ -551,6 +551,5 @@ Your job is to refine the context output, make the context output short and conc
 	if err != nil {
 		return err
 	}
-	w.toolLog = tools.GetToolLog()
 	return nil
 }

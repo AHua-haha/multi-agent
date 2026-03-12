@@ -53,6 +53,9 @@ func (td *ToolDispatcher) GetToolLog() []*ToolExecLog {
 	return td.toolLog
 }
 
+func (td *ToolDispatcher) ResetTools() {
+	td.toolMap = map[string]ToolEndPoint{}
+}
 func (td *ToolDispatcher) RegisterToolEndpoint(endpoints ...ToolEndPoint) error {
 	err := []error{}
 	for _, endpoint := range endpoints {

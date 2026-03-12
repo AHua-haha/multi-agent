@@ -16,9 +16,19 @@ type Workflow struct {
 	mcpclient *mcpclient.ClientMgr
 	client    *openai.Client
 
-	toolLog []*service.ToolExecLog
+	toolDispatcher *service.ToolDispatcher
 
 	taskMgr *service.TaskMgr
+}
+
+func NewWorkFlow() *Workflow {
+	w := &Workflow{
+		toolDispatcher: &service.ToolDispatcher{},
+	}
+	w.taskMgr = &service.TaskMgr{
+		ToolDispatcher: w.toolDispatcher,
+	}
+	return w
 }
 
 func (w *Workflow) Close() error {
@@ -55,7 +65,6 @@ func (w *Workflow) Init() error {
 }
 
 func (w *Workflow) Run() error {
-	w.taskMgr = &service.TaskMgr{}
 	for {
 		reader := bufio.NewReader(os.Stdin)
 		fmt.Print("Enter text: ")

@@ -8,7 +8,7 @@ import (
 )
 
 func main() {
-	workflow := agent.Workflow{}
+	workflow := agent.NewWorkFlow()
 	err := workflow.Init()
 	if err != nil {
 		log.Error().Err(err).Msg("workflow init failed")

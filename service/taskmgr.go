@@ -55,7 +55,7 @@ type TaskMgr struct {
 	UserGoal       string
 	PreTasks       []Task
 	CurrentTask    Task
-	toolDispatcher *ToolDispatcher
+	ToolDispatcher *ToolDispatcher
 }
 
 func (mgr *TaskMgr) Reset(userGoal string) {
@@ -67,10 +67,10 @@ func (mgr *TaskMgr) Reset(userGoal string) {
 func (mgr *TaskMgr) FillToolLog(context []ContextItem) error {
 	var err []error
 	for i, elem := range context {
-		if elem.ID < 0 || elem.ID >= len(mgr.toolDispatcher.toolLog) {
-			err = append(err, fmt.Errorf("invalid tool log ID %d, must be between 0 and %d", elem.ID, len(mgr.toolDispatcher.toolLog)-1))
+		if elem.ID < 0 || elem.ID >= len(mgr.ToolDispatcher.toolLog) {
+			err = append(err, fmt.Errorf("invalid tool log ID %d, must be between 0 and %d", elem.ID, len(mgr.ToolDispatcher.toolLog)-1))
 		} else {
-			context[i].ToolLog = mgr.toolDispatcher.toolLog[elem.ID]
+			context[i].ToolLog = mgr.ToolDispatcher.toolLog[elem.ID]
 		}
 	}
 	if len(err) != 0 {

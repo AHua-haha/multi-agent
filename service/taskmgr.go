@@ -405,3 +405,22 @@ func (mgr *TaskMgr) FinishVerifyTaskTool() ToolEndPoint {
 	}
 	return endpoint
 }
+
+func (mgr *TaskMgr) GetCurrentTaskType() string {
+	if mgr.CurrentTask == nil {
+		return ""
+	}
+
+	switch mgr.CurrentTask.(type) {
+	case *ExploreTask:
+		return "explore"
+	case *ReasonTask:
+		return "reason"
+	case *BuildTask:
+		return "build"
+	case *VerifyTask:
+		return "verify"
+	default:
+		return ""
+	}
+}

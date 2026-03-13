@@ -56,56 +56,63 @@ func (t *VerifyTask) GetTask() string {
 
 func (t *ExploreTask) FormatString() string {
 	var builder strings.Builder
-	builder.WriteString(fmt.Sprintf("Explore Task: %s\n", t.Task))
-	builder.WriteString(fmt.Sprintf("Expected Output:\n%s\n", t.ExpectOutput))
+	builder.WriteString("--- EXPLORE TASK ---\n")
+	builder.WriteString(fmt.Sprintf("Goal: %s\n", t.Task))
+	builder.WriteString(fmt.Sprintf("Expected Output: %s\n", t.ExpectOutput))
 	if len(t.Context) > 0 {
-		builder.WriteString("Context: ")
+		builder.WriteString("\nContext Items:\n")
 		for _, ctx := range t.Context {
-			builder.WriteString(fmt.Sprintf("#%d: %s, ", ctx.ID, ctx.Desc))
+			builder.WriteString(fmt.Sprintf("#%d: %s\n", ctx.ID, ctx.Desc))
 		}
-		builder.WriteByte('\n')
 	}
 	return builder.String()
 }
 
 func (t *ReasonTask) FormatString() string {
 	var builder strings.Builder
-	builder.WriteString(fmt.Sprintf("Reason Task: %s\n", t.Task))
-	builder.WriteString(fmt.Sprintf("Expected Output:\n%s\n", t.ExpectOutput))
+	builder.WriteString("--- REASON TASK ---\n")
+	builder.WriteString(fmt.Sprintf("Goal: %s\n", t.Task))
+	builder.WriteString(fmt.Sprintf("Expected Output: %s\n", t.ExpectOutput))
 	if t.Conclusion != "" {
-		builder.WriteString(fmt.Sprintf("Conclusion:\n%s\n", t.Conclusion))
+		builder.WriteString("\nConclusion:\n")
+		builder.WriteString(t.Conclusion)
+		builder.WriteByte('\n')
 	}
 	return builder.String()
 }
 
 func (t *BuildTask) FormatString() string {
 	var builder strings.Builder
-	builder.WriteString(fmt.Sprintf("Build Task: %s\n", t.Task))
+	builder.WriteString("--- BUILD TASK ---\n")
+	builder.WriteString(fmt.Sprintf("Goal: %s\n", t.Task))
 	if t.ChangeLog != "" {
-		builder.WriteString(fmt.Sprintf("Change Log:\n%s\n", t.ChangeLog))
+		builder.WriteString("\nChange Log:\n")
+		builder.WriteString(t.ChangeLog)
+		builder.WriteByte('\n')
 	}
 	if len(t.Context) > 0 {
-		builder.WriteString("Context: ")
+		builder.WriteString("\nContext Items:\n")
 		for _, ctx := range t.Context {
-			builder.WriteString(fmt.Sprintf("#%d: %s, ", ctx.ID, ctx.Desc))
+			builder.WriteString(fmt.Sprintf("#%d: %s\n", ctx.ID, ctx.Desc))
 		}
-		builder.WriteByte('\n')
 	}
 	return builder.String()
 }
 
 func (t *VerifyTask) FormatString() string {
 	var builder strings.Builder
-	builder.WriteString(fmt.Sprintf("Verify Task: %s\n", t.Task))
+	builder.WriteString("--- VERIFY TASK ---\n")
+	builder.WriteString(fmt.Sprintf("Goal: %s\n", t.Task))
 	if t.Conclusion != "" {
-		builder.WriteString(fmt.Sprintf("Conclusion:\n%s\n", t.Conclusion))
+		builder.WriteString("\nConclusion:\n")
+		builder.WriteString(t.Conclusion)
+		builder.WriteByte('\n')
 	}
 	if len(t.Context) > 0 {
-		builder.WriteString("Context: ")
+		builder.WriteString("\nContext Items:\n")
 		for _, ctx := range t.Context {
-			builder.WriteString(fmt.Sprintf("#%d: %s, ", ctx.ID, ctx.Desc))
+			builder.WriteString(fmt.Sprintf("#%d: %s\n", ctx.ID, ctx.Desc))
 		}
-		builder.WriteByte('\n')
 	}
 	return builder.String()
 }

@@ -19,13 +19,20 @@ type BaseAgent struct {
 	toolDispatch *service.ToolDispatcher
 }
 
-func NewBaseAgent(instruct string, userInput string, tools *service.ToolDispatcher) *BaseAgent {
-	input := []openai.ChatCompletionMessage{
+func NewBaseAgent(instruct string, userInput string, tools *service.ToolDispatcher, prevToolMessages []openai.ChatCompletionMessage) *BaseAgent {
+	// Build input messages with system prompt, user input, and previous tool logs
+	messages := []openai.ChatCompletionMessage{
 		{Role: openai.ChatMessageRoleSystem, Content: instruct},
 		{Role: openai.ChatMessageRoleUser, Content: userInput},
 	}
+
+	// Add previous tool messages if provided
+	if len(prevToolMessages) > 0 {
+		messages = append(messages, prevToolMessages...)
+	}
+
 	return &BaseAgent{
-		input:        input,
+		input:        messages,
 		toolDispatch: tools,
 	}
 }

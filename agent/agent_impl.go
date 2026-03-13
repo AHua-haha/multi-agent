@@ -127,7 +127,8 @@ If Task History provides a complete answer:
 	tools.ResetTools()
 	tools.RegisterToolEndpoint(w.taskMgr.CreateExploreTaskTool(), w.taskMgr.CreateReasonTaskTool(), w.taskMgr.CreateBuildTaskTool(), w.taskMgr.CreateVerifyTaskTool())
 	userInput := w.taskMgr.GetTaskContextPrompt()
-	agent := NewBaseAgent(instruct, userInput, tools)
+	prevToolMessages := w.taskMgr.GetAllTaskToolCallMessages()
+	agent := NewBaseAgent(instruct, userInput, tools, prevToolMessages)
 
 	var final_msg string = ""
 
@@ -228,7 +229,8 @@ The task includes an "Expected Output" that tells you exactly what context to ga
 	tools.RegisterToolEndpoint(w.taskMgr.FinishExploreTaskTool())
 	tools.RegisterToolEndpoint(mcpTool...)
 	userInput := w.taskMgr.GetTaskContextPrompt()
-	agent := NewBaseAgent(instruct, userInput, tools)
+	prevToolMessages := w.taskMgr.GetAllTaskToolCallMessages()
+	agent := NewBaseAgent(instruct, userInput, tools, prevToolMessages)
 
 	outputFunc := func(msg openai.ChatCompletionMessage) bool {
 		if len(msg.ToolCalls) != 0 {
@@ -306,7 +308,8 @@ You are the **Reason Worker Agent**. Your ONLY goal is to analyze information an
 	tools.RegisterToolEndpoint(w.taskMgr.FinishReasonTaskTool())
 	tools.RegisterToolEndpoint(mcpTool...)
 	userInput := w.taskMgr.GetTaskContextPrompt()
-	agent := NewBaseAgent(instruct, userInput, tools)
+	prevToolMessages := w.taskMgr.GetAllTaskToolCallMessages()
+	agent := NewBaseAgent(instruct, userInput, tools, prevToolMessages)
 
 	outputFunc := func(msg openai.ChatCompletionMessage) bool {
 		if len(msg.ToolCalls) != 0 {
@@ -392,7 +395,8 @@ You are the **Build Worker Agent**. Your ONLY goal is to implement changes to th
 	tools.RegisterToolEndpoint(w.taskMgr.FinishBuildTaskTool())
 	tools.RegisterToolEndpoint(mcpTool...)
 	userInput := w.taskMgr.GetTaskContextPrompt()
-	agent := NewBaseAgent(instruct, userInput, tools)
+	prevToolMessages := w.taskMgr.GetAllTaskToolCallMessages()
+	agent := NewBaseAgent(instruct, userInput, tools, prevToolMessages)
 
 	outputFunc := func(msg openai.ChatCompletionMessage) bool {
 		if len(msg.ToolCalls) != 0 {
@@ -507,7 +511,8 @@ Record evidence supporting your conclusion:
 	tools.RegisterToolEndpoint(w.taskMgr.FinishVerifyTaskTool())
 	tools.RegisterToolEndpoint(mcpTool...)
 	userInput := w.taskMgr.GetTaskContextPrompt()
-	agent := NewBaseAgent(instruct, userInput, tools)
+	prevToolMessages := w.taskMgr.GetAllTaskToolCallMessages()
+	agent := NewBaseAgent(instruct, userInput, tools, prevToolMessages)
 
 	outputFunc := func(msg openai.ChatCompletionMessage) bool {
 		if len(msg.ToolCalls) != 0 {
@@ -545,7 +550,8 @@ Your job is to refine the context output, make the context output short and conc
 	tools.RegisterToolEndpoint(w.taskMgr.RefineContextTool())
 	tools.RegisterToolEndpoint(mcpTool...)
 	userInput := w.taskMgr.GetInputForRefineContext()
-	agent := NewBaseAgent(instruct, userInput, tools)
+	prevToolMessages := w.taskMgr.GetAllTaskToolCallMessages()
+	agent := NewBaseAgent(instruct, userInput, tools, prevToolMessages)
 
 	err = agent.Run(w.client, "glm-5", nil)
 	if err != nil {

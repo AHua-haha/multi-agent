@@ -16,26 +16,50 @@ type ToolEndPoint struct {
 }
 
 type ToolExecLog struct {
-	ID           int
-	ToolCallName string
-	ToolCallArgs string
-	ToolCallRes  string
-	ToolCallErr  error
+	ID         int
+	ToolCall   openai.ToolCall
+	ToolRes    string
+	ToolErr    error
 }
 
 func (toolLog *ToolExecLog) formatString() string {
 	var builder strings.Builder
 	builder.WriteString("** Metadata **\n")
 	builder.WriteString(fmt.Sprintf("TOOL_LOG_ID: %d\n", toolLog.ID))
+	builder.WriteString(fmt.Sprintf("TOOL_NAME: %s\n", toolLog.ToolCall.Function.Name))
 	builder.WriteString("** Status **\n")
-	if toolLog.ToolCallErr != nil {
-		builder.WriteString(fmt.Sprintf("Execute tool call failed, error: %s\n", toolLog.ToolCallErr))
+	if toolLog.ToolErr != nil {
+		builder.WriteString(fmt.Sprintf("Execute tool call failed, error: %s\n", toolLog.ToolErr))
 	} else {
 		builder.WriteString("Execute tool call success\n")
 		builder.WriteString("** Result **\n")
-		builder.WriteString(toolLog.ToolCallRes)
+		builder.WriteString(toolLog.ToolRes)
 	}
 	return builder.String()
+}
+
+// ReconstructAssistantMessage reconstructs the assistant message for this tool call
+func (toolLog *ToolExecLog) ReconstructAssistantMessage() openai.ChatCompletionMessage {
+	return openai.ChatCompletionMessage{
+		Role: openai.ChatMessageRoleAssistant,
+		ToolCalls: []openai.ToolCall{
+			toolLog.ToolCall,
+		},
+	}
+}
+
+// ReconstructToolMessage reconstructs the tool response message
+func (toolLog *ToolExecLog) ReconstructToolMessage() openai.ChatCompletionMessage {
+	content := toolLog.ToolRes
+	if toolLog.ToolErr != nil {
+		content = fmt.Sprintf("Error: %s", toolLog.ToolErr)
+	}
+
+	return openai.ChatCompletionMessage{
+		Role:       openai.ChatMessageRoleTool,
+		ToolCallID: toolLog.ToolCall.ID,
+		Content:    content,
+	}
 }
 
 type ToolDispatcher struct {
@@ -83,11 +107,10 @@ func (td *ToolDispatcher) Run(toolCall openai.ToolCall) openai.ChatCompletionMes
 		err = fmt.Errorf("Run tool call failed, Can not find tool with name %s", toolCall.Function.Name)
 	}
 	log := ToolExecLog{
-		ID:           len(td.toolLog),
-		ToolCallName: toolCall.Function.Name,
-		ToolCallArgs: toolCall.Function.Arguments,
-		ToolCallRes:  content,
-		ToolCallErr:  err,
+		ID:         len(td.toolLog),
+		ToolCall:   toolCall,
+		ToolRes:    content,
+		ToolErr:    err,
 	}
 	td.toolLog = append(td.toolLog, &log)
 	res.Content = log.formatString()

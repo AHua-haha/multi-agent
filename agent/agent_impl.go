@@ -102,7 +102,7 @@ If information is missing or work remains:
 4. **Keep expectations focused**: Request only 1-3 most essential outputs
 
 ### PATH B: GOAL COMPLETED (FINALIZE)
-If the User Primary Goal is completed, use the tool to finish the work.
+If the User Primary Goal is completed, return the final response.
 
 ## Critical Rules
 
@@ -202,12 +202,7 @@ The task includes an "Expected Output" that tells you exactly what context to ga
 
 	tools := w.toolDispatcher
 	tools.ResetTools()
-	mcpTool, err := w.mcpclient.LoadAllTools()
-	if err != nil {
-		return err
-	}
-	tools.RegisterToolEndpoint(w.taskMgr.FinishExploreTaskTool())
-	tools.RegisterToolEndpoint(mcpTool...)
+	tools.RegisterToolEndpoint(w.taskMgr.FinishExploreTaskTool(), w.taskMgr.BashTool())
 	userInput := w.taskMgr.GetTaskContextPrompt()
 	prevToolMessages := w.taskMgr.GetAllTaskToolCallMessages()
 	agent := NewBaseAgent(instruct, userInput, tools, prevToolMessages)
@@ -223,7 +218,7 @@ The task includes an "Expected Output" that tells you exactly what context to ga
 		return false
 	}
 
-	err = agent.Run(w.client, "glm-5", outputFunc)
+	err := agent.Run(w.client, "glm-5", outputFunc)
 	if err != nil {
 		return err
 	}
@@ -279,12 +274,7 @@ You are the **Reason Worker Agent**. Your ONLY goal is to analyze information an
 
 	tools := w.toolDispatcher
 	tools.ResetTools()
-	mcpTool, err := w.mcpclient.LoadAllTools()
-	if err != nil {
-		return err
-	}
-	tools.RegisterToolEndpoint(w.taskMgr.FinishReasonTaskTool())
-	tools.RegisterToolEndpoint(mcpTool...)
+	tools.RegisterToolEndpoint(w.taskMgr.FinishReasonTaskTool(), w.taskMgr.BashTool())
 	userInput := w.taskMgr.GetTaskContextPrompt()
 	prevToolMessages := w.taskMgr.GetAllTaskToolCallMessages()
 	agent := NewBaseAgent(instruct, userInput, tools, prevToolMessages)
@@ -300,7 +290,7 @@ You are the **Reason Worker Agent**. Your ONLY goal is to analyze information an
 		return false
 	}
 
-	err = agent.Run(w.client, "glm-5", outputFunc)
+	err := agent.Run(w.client, "glm-5", outputFunc)
 	if err != nil {
 		return err
 	}
@@ -360,12 +350,7 @@ You are the **Build Worker Agent**. Your ONLY goal is to implement changes to th
 
 	tools := w.toolDispatcher
 	tools.ResetTools()
-	mcpTool, err := w.mcpclient.LoadAllTools()
-	if err != nil {
-		return err
-	}
-	tools.RegisterToolEndpoint(w.taskMgr.FinishBuildTaskTool())
-	tools.RegisterToolEndpoint(mcpTool...)
+	tools.RegisterToolEndpoint(w.taskMgr.FinishBuildTaskTool(), w.taskMgr.BashTool())
 	userInput := w.taskMgr.GetTaskContextPrompt()
 	prevToolMessages := w.taskMgr.GetAllTaskToolCallMessages()
 	agent := NewBaseAgent(instruct, userInput, tools, prevToolMessages)
@@ -381,7 +366,7 @@ You are the **Build Worker Agent**. Your ONLY goal is to implement changes to th
 		return false
 	}
 
-	err = agent.Run(w.client, "glm-5", outputFunc)
+	err := agent.Run(w.client, "glm-5", outputFunc)
 	if err != nil {
 		return err
 	}
@@ -471,12 +456,7 @@ Record evidence supporting your conclusion:
 
 	tools := w.toolDispatcher
 	tools.ResetTools()
-	mcpTool, err := w.mcpclient.LoadAllTools()
-	if err != nil {
-		return err
-	}
-	tools.RegisterToolEndpoint(w.taskMgr.FinishVerifyTaskTool())
-	tools.RegisterToolEndpoint(mcpTool...)
+	tools.RegisterToolEndpoint(w.taskMgr.FinishVerifyTaskTool(), w.taskMgr.BashTool())
 	userInput := w.taskMgr.GetTaskContextPrompt()
 	prevToolMessages := w.taskMgr.GetAllTaskToolCallMessages()
 	agent := NewBaseAgent(instruct, userInput, tools, prevToolMessages)
@@ -492,7 +472,7 @@ Record evidence supporting your conclusion:
 		return false
 	}
 
-	err = agent.Run(w.client, "glm-5", outputFunc)
+	err := agent.Run(w.client, "glm-5", outputFunc)
 	if err != nil {
 		return err
 	}

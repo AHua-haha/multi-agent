@@ -33,7 +33,7 @@ func init() {
 		NoColor: false, // Set to true to disable colors
 	}
 	log.Logger = zerolog.New(consoleWriter).
-		Level(zerolog.DebugLevel).
+		Level(zerolog.Disabled).
 		With().
 		Timestamp().
 		Caller().

@@ -2,11 +2,11 @@ package agent
 
 import (
 	"bufio"
+	"encoding/json"
 	"fmt"
 	mcpclient "multi-agent/mcp-client"
 	"multi-agent/service"
 	"os"
-	"strings"
 
 	"github.com/rs/zerolog/log"
 	"github.com/sashabaranov/go-openai"
@@ -49,28 +49,37 @@ func (w *Workflow) Init() error {
 	w.client = openai.NewClientWithConfig(config)
 	log.Info().Msg("create openai client success")
 
-	w.mcpclient = mcpclient.NewclientMgr()
-	err := w.mcpclient.NewMCPClient("uv", nil, "run", "/root/multi-agent/cmds/lsp-mcp.py")
-	if err != nil {
-		return err
-	}
-	log.Info().Any("server", "lsp-mcp").Msg("create mcp client success")
+	// w.mcpclient = mcpclient.NewclientMgr()
+	// err := w.mcpclient.NewMCPClient("uv", nil, "run", "/root/multi-agent/cmds/lsp-mcp.py")
+	// if err != nil {
+	// 	return err
+	// }
+	// log.Info().Any("server", "lsp-mcp").Msg("create mcp client success")
 
-	err = w.mcpclient.NewMCPClient("/root/multi-agent/bin/mcpserver", nil)
-	if err != nil {
-		return err
-	}
-	log.Info().Any("server", "mcpserver").Msg("create mcp client success")
+	// err = w.mcpclient.NewMCPClient("/root/multi-agent/bin/mcpserver", nil)
+	// if err != nil {
+	// 	return err
+	// }
+	// log.Info().Any("server", "mcpserver").Msg("create mcp client success")
 	return nil
 }
 
 func (w *Workflow) Run() error {
 	for {
-		reader := bufio.NewReader(os.Stdin)
-		fmt.Print("Enter text: ")
-		input, _ := reader.ReadString('\n')
-		input = strings.TrimSpace(input)
-		w.taskMgr.Reset(input)
+		scanner := bufio.NewScanner(os.Stdin)
+		var input struct {
+			Task string
+		}
+		if !scanner.Scan() {
+			return fmt.Errorf("can not read from stdin")
+		}
+		line := scanner.Text() // Automatically trims the newline
+		err := json.Unmarshal([]byte(line), &input)
+		if err != nil {
+			log.Error().Err(err).Msg("parse input task failed")
+			return err
+		}
+		w.taskMgr.Reset(input.Task)
 
 		log.Info().Msg("agent start running")
 		for {
@@ -80,7 +89,8 @@ func (w *Workflow) Run() error {
 				break
 			}
 			if res != "" {
-				fmt.Printf("Final Response:\n%s\n", res)
+				println("DONE")
+				// fmt.Printf("Final Response:\n%s\n", res)
 				break
 			}
 			err = w.WorkerAgent()

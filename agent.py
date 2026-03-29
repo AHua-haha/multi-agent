@@ -14,6 +14,9 @@ from minisweagent.run.benchmarks.swebench import (
 from minisweagent.utils.log import logger
 from minisweagent.utils.serialize import UNSET, recursive_merge
 from pprint import pprint
+import subprocess
+import time
+import json
 
 DEFAULT_OUTPUT_FILE = global_config_dir / "last_swebench_single_run.traj.json"
 DEFAULT_CONFIG_FILE = builtin_config_dir / "benchmarks" / "swebench.yaml"
@@ -158,17 +161,40 @@ def main(
     config = recursive_merge(*configs)
 
     env = get_sb_environment(config, instance)
-    agent = get_agent(
-        get_model(config=config.get("model", {})),
-        env,
-        config.get("agent", {}),
-        default_type="interactive",
-    )
-    print("config done")
     prompt = userPrompt.format(task=instance["problem_statement"])
     print(prompt)
-    # agent.run(instance["problem_statement"])
+    process = subprocess.Popen(
+        ["./main"],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        bufsize=1 # Line buffered
+    )
+    inputStr = json.dumps({
+        "Task":userPrompt
+    })
+    print(inputStr)
+    process.stdin.write(inputStr + "\n")
+    process.stdin.flush()
+    print("input")
+    
 
+    while(True):
+        output = process.stdout.readline().strip()
+        if output == "DONE":
+            break
+        print(output.strip())
+        args = json.loads(output)
+        res = env.execute(action={
+            "command": args["Command"]
+        }, cwd=args["Cwd"])
+        print(res)
+        inputStr = json.dumps({
+            "Code":res["returncode"],
+            "Output":res["output"]
+        })
+        process.stdin.write(inputStr + "\n")
 
 if __name__ == "__main__":
     app()

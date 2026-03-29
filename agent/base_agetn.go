@@ -60,10 +60,10 @@ func (a *BaseAgent) handleToolCall(toolCalls []openai.ToolCall) {
 	for _, call := range toolCalls {
 		res := a.toolDispatch.Run(call)
 		a.actionStack = append(a.actionStack, res)
-		writer.WriteString("<TOOL CALL>\n")
-		writer.WriteString(fmt.Sprintf("tool name: %s\ntool args: %s\n", call.Function.Name, call.Function.Arguments))
-		writer.WriteString(fmt.Sprintf("result:\n%s", res.Content))
-		writer.WriteString("</TOOL CALL>\n")
+		Writer.WriteString("<TOOL CALL>\n")
+		Writer.WriteString(fmt.Sprintf("tool name: %s\ntool args: %s\n", call.Function.Name, call.Function.Arguments))
+		Writer.WriteString(fmt.Sprintf("result:\n%s", res.Content))
+		Writer.WriteString("</TOOL CALL>\n")
 	}
 }
 func (a *BaseAgent) Run(client *openai.Client, model string, outputFunc OutputFunc) error {
@@ -72,10 +72,10 @@ func (a *BaseAgent) Run(client *openai.Client, model string, outputFunc OutputFu
 		panic(err)
 	}
 	defer f.Close()
-	writer = bufio.NewWriter(f)
+	Writer = bufio.NewWriter(f)
 
-	writer.WriteString(fmt.Sprintf("SYSTEM PROMPT: %s\n", a.input[0].Content))
-	writer.WriteString(fmt.Sprintf("User Input: %s\n\n", a.input[1].Content))
+	Writer.WriteString(fmt.Sprintf("SYSTEM PROMPT: %s\n", a.input[0].Content))
+	Writer.WriteString(fmt.Sprintf("%s\n\n", a.input[1].Content))
 
 	a.actionStack = nil
 	for {
@@ -85,10 +85,10 @@ func (a *BaseAgent) Run(client *openai.Client, model string, outputFunc OutputFu
 			return err
 		}
 		a.actionStack = append(a.actionStack, resp.Message)
-		writer.WriteString("<MSG> clean thinking\n")
-		writer.WriteString(fmt.Sprintf("Role: %s\n", resp.Message.Role))
-		writer.WriteString(fmt.Sprintf("content:\n%s\n", resp.Message.Content))
-		writer.WriteString("</MSG>\n")
+		Writer.WriteString("<MSG> clean thinking\n")
+		Writer.WriteString(fmt.Sprintf("Role: %s\n", resp.Message.Role))
+		Writer.WriteString(fmt.Sprintf("content:\n%s\n", resp.Message.Content))
+		Writer.WriteString("</MSG>\n")
 
 		a.handleToolCall(resp.Message.ToolCalls)
 
@@ -102,8 +102,8 @@ func (a *BaseAgent) Run(client *openai.Client, model string, outputFunc OutputFu
 			break
 		}
 	}
-	writer.Flush()
+	Writer.Flush()
 	return nil
 }
 
-var writer *bufio.Writer
+var Writer *bufio.Writer

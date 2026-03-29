@@ -88,7 +88,7 @@ func (w *Workflow) Run() error {
 				log.Error().Err(err).Msg("run worker agent failed")
 				break
 			}
-			w.ContextAgent()
+			// w.ContextAgent()
 		}
 		log.Info().Msg("agent finish running")
 	}

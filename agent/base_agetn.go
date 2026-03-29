@@ -21,6 +21,9 @@ type BaseAgent struct {
 
 func NewBaseAgent(instruct string, userInput string, tools *service.ToolDispatcher, prevToolMessages []openai.ChatCompletionMessage) *BaseAgent {
 	// Build input messages with system prompt, user input, and previous tool logs
+	for _, msg := range prevToolMessages {
+		fmt.Printf("msg.Content: %v\n", msg.Content)
+	}
 	messages := []openai.ChatCompletionMessage{
 		{Role: openai.ChatMessageRoleSystem, Content: instruct},
 		{Role: openai.ChatMessageRoleUser, Content: userInput},

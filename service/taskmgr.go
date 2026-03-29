@@ -1,9 +1,11 @@
 package service
 
 import (
+	"bufio"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/sashabaranov/go-openai"
@@ -402,6 +404,57 @@ func (mgr *TaskMgr) FinishVerifyTaskTool() ToolEndPoint {
 			return "", err
 		}
 		return "", nil
+	}
+	return endpoint
+}
+
+func (mgr *TaskMgr) BashTool() ToolEndPoint {
+	def := openai.FunctionDefinition{
+		Name:        "bash",
+		Description: "Executes a bash command in a specified directory and returns the exit code and the output conbining stdout and stderr",
+		Parameters: jsonschema.Definition{
+			Type: jsonschema.Object,
+			Properties: map[string]jsonschema.Definition{
+				"Command": {
+					Type:        jsonschema.String,
+					Description: "The full bash command string to execute (e.g., 'go test ./...', 'ls -la', etc.).",
+				},
+				"Cwd": {
+					Type:        jsonschema.String,
+					Description: "The working directory in which to execute the command. Defaults to the current project root if not specified.",
+				},
+			},
+			Required: []string{"Command", "Cwd"},
+		},
+	}
+	Handler := func(args string) (string, error) {
+		println(args)
+		scanner := bufio.NewScanner(os.Stdin)
+		var output struct {
+			Code   int
+			Output string
+		}
+		if !scanner.Scan() {
+			return "", fmt.Errorf("can not read from stdin")
+		}
+		line := scanner.Text() // Automatically trims the newline
+		err := json.Unmarshal([]byte(line), &output)
+		if err != nil {
+			return "", err
+		}
+		var builder strings.Builder
+		builder.WriteString("<returncode>")
+		builder.WriteString(fmt.Sprintf("%d", output.Code))
+		builder.WriteString("</returncode>\n")
+		builder.WriteString("<output>\n")
+		builder.WriteString(output.Output)
+		builder.WriteString("</output>\n")
+		return builder.String(), nil
+	}
+	endpoint := ToolEndPoint{
+		Name:    "bash",
+		Def:     def,
+		Handler: Handler,
 	}
 	return endpoint
 }

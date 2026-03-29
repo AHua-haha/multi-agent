@@ -16,25 +16,16 @@ type ToolEndPoint struct {
 }
 
 type ToolExecLog struct {
-	ID         int
-	ToolCall   openai.ToolCall
-	ToolRes    string
-	ToolErr    error
+	ID       int
+	ToolCall openai.ToolCall
+	ToolRes  string
+	ToolErr  error
 }
 
 func (toolLog *ToolExecLog) formatString() string {
 	var builder strings.Builder
-	builder.WriteString("** Metadata **\n")
-	builder.WriteString(fmt.Sprintf("TOOL_LOG_ID: %d\n", toolLog.ID))
-	builder.WriteString(fmt.Sprintf("TOOL_NAME: %s\n", toolLog.ToolCall.Function.Name))
-	builder.WriteString("** Status **\n")
-	if toolLog.ToolErr != nil {
-		builder.WriteString(fmt.Sprintf("Execute tool call failed, error: %s\n", toolLog.ToolErr))
-	} else {
-		builder.WriteString("Execute tool call success\n")
-		builder.WriteString("** Result **\n")
-		builder.WriteString(toolLog.ToolRes)
-	}
+	builder.WriteString(fmt.Sprintf("<ToolLogID>%d</ToolLogID>\n", toolLog.ID))
+	builder.WriteString(toolLog.ToolRes)
 	return builder.String()
 }
 
@@ -107,10 +98,10 @@ func (td *ToolDispatcher) Run(toolCall openai.ToolCall) openai.ChatCompletionMes
 		err = fmt.Errorf("Run tool call failed, Can not find tool with name %s", toolCall.Function.Name)
 	}
 	log := ToolExecLog{
-		ID:         len(td.toolLog),
-		ToolCall:   toolCall,
-		ToolRes:    content,
-		ToolErr:    err,
+		ID:       len(td.toolLog),
+		ToolCall: toolCall,
+		ToolRes:  content,
+		ToolErr:  err,
 	}
 	td.toolLog = append(td.toolLog, &log)
 	res.Content = log.formatString()
